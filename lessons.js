@@ -143,18 +143,167 @@ window.LESSONS = [
     skill: "Reconnaît rouge, bleu, jaune, vert"
   },
 
-  // ---------------- WEEK 2 ----------------
-  { id: "w2d1", week: 2, day: "Monday", title: "Pets", emoji: "🐱", ready: false,
-    words: ["cat", "dog", "fish", "bird"], target: "It's a cat. / I see a dog.",
-    video: { title: "I Have A Pet — Super Simple Songs", youtubeId: "pWepfJ-8XU0", page: "https://supersimple.com/song/i-have-a-pet/" } },
-  { id: "w2d2", week: 2, day: "Tuesday", title: "More animals", emoji: "🦁", ready: false,
-    words: ["rabbit", "duck", "lion", "elephant"], target: "It's a lion. / It's a duck." },
-  { id: "w2d3", week: 2, day: "Wednesday", title: "Colors around us", emoji: "🚗", ready: false,
-    words: ["red", "blue", "yellow", "green"], target: "A red ball. / A blue car." },
-  { id: "w2d4", week: 2, day: "Thursday", title: "Move your body", emoji: "🤸", ready: false,
-    words: ["jump", "run", "sit", "stand"], target: "Jump! / Sit down. / Stand up." },
-  { id: "w2d5", week: 2, day: "Friday", title: "Animal show", emoji: "🎪", ready: false,
-    words: ["review"], target: "It's a dog. It's brown. Woof, woof!" },
+  // ---------------- WEEK 2 — Animals, colors and actions ----------------
+  // card.ask: on some game rounds Fox asks with the animal sound instead of the word.
+  // moves: "Simon says" actions done in the Play step (she acts, no listening).
+  {
+    id: "w2d1", week: 2, day: "Monday", title: "Pets", emoji: "🐱", ready: true,
+    warmup: {
+      say: "Hello, {name}! Meow! Woof! Let's meet some pets!", key: "hello",
+      prompt: "Say: Hello, pets!",
+      parent: "Révision rapide de la semaine 1 (Hello, name, colors). Si vous avez des animaux en peluche, sortez-les : un chat, un chien…"
+    },
+    cards: [
+      { word: "cat", emoji: "🐱", say: "Cat. It's a cat!", ask: "Meow! Who says meow?" },
+      { word: "dog", emoji: "🐶", say: "Dog. It's a dog!", ask: "Woof woof! Who says woof?" },
+      { word: "fish", emoji: "🐟", say: "Fish. It's a fish!", ask: "Glub glub! Who says glub glub?" },
+      { word: "bird", emoji: "🐦", say: "Bird. It's a bird!", ask: "Tweet tweet! Who says tweet?" }
+    ],
+    video: { title: "I Have A Pet — Super Simple Songs", youtubeId: "pWepfJ-8XU0", page: "https://supersimple.com/song/i-have-a-pet/" },
+    chant: ["I have a pet!", "It's a cat. Meow!", "It's a dog. Woof!", "It's a fish. Glub glub!", "It's a bird. Tweet tweet!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What is it?" },
+        { who: "{name}", line: "It's a cat!" },
+        { who: "Parent", line: "What does the dog say?" },
+        { who: "{name}", line: "Woof woof!" },
+        { who: "Parent", line: "I see a bird!" },
+        { who: "{name}", line: "I see a fish!" }
+      ],
+      activity: "Associez les animaux en peluche aux images. Tenez un animal : « What is it? ». Si elle hésite, proposez un choix : « Is it a cat or a dog? ». Elle peut d'abord montrer du doigt, puis répéter."
+    },
+    skill: "Nomme chat, chien, poisson, oiseau"
+  },
+  {
+    id: "w2d2", week: 2, day: "Tuesday", title: "More animals", emoji: "🦁", ready: true,
+    warmup: {
+      say: "Roar! I'm a lion! Hello, {name}! Can you roar?", key: "roar",
+      prompt: "Roar like a lion!",
+      parent: "Faites le lion ensemble (mains en griffes). Révision : montrez un chat et un chien, demandez « What is it? »."
+    },
+    cards: [
+      { word: "rabbit", emoji: "🐰", say: "Rabbit. It's a rabbit!", ask: "Hop, hop, hop! Who hops?" },
+      { word: "duck", emoji: "🦆", say: "Duck. It's a duck!", ask: "Quack quack! Who says quack?" },
+      { word: "lion", emoji: "🦁", say: "Lion. It's a lion!", ask: "Roar! Who says roar?" },
+      { word: "elephant", emoji: "🐘", say: "Elephant. It's an elephant!" }
+    ],
+    video: { title: "Let's Go To The Zoo — Super Simple Songs", youtubeId: "OwRmivbNgQk", page: "https://supersimple.com/song/lets-go-to-the-zoo/" },
+    moves: [
+      { emoji: "🐰", say: "Hop like a rabbit!" },
+      { emoji: "🦆", say: "Walk like a duck! Quack quack!" },
+      { emoji: "🦁", say: "Roar like a lion!" },
+      { emoji: "🐘", say: "Stomp like an elephant!" }
+    ],
+    chant: ["Hop, hop, rabbit!", "Quack, quack, duck!", "Roar, roar, lion!", "Stomp, stomp, elephant!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What is it?" },
+        { who: "{name}", line: "It's a lion!" },
+        { who: "Parent", line: "Is it a duck or a rabbit?" },
+        { who: "{name}", line: "It's a duck!" }
+      ],
+      activity: "Devinette : imitez un animal (lion, canard, lapin, éléphant), elle devine en anglais : « It's a lion! ». Puis c'est elle qui imite et vous qui devinez. La vidéo du zoo montre d'autres animaux (kangourou, singe, pingouin) : bonus, pas besoin de les retenir."
+    },
+    skill: "Nomme lapin, canard, lion, éléphant"
+  },
+  {
+    id: "w2d3", week: 2, day: "Wednesday", title: "Colors around us", emoji: "🚗", ready: true,
+    warmup: {
+      say: "Hello, {name}! Red, blue, yellow, green! Can you say red?", key: "red",
+      prompt: "Say: Red!",
+      parent: "Révision des couleurs de la semaine 1. Préparez des jouets de 4 couleurs (rouge, bleu, jaune, vert) pour le jeu de tri."
+    },
+    cards: [
+      { word: "a red apple", emoji: "🍎", say: "A red apple.", key: "red apple" },
+      { word: "a blue car", emoji: "🚙", say: "A blue car.", key: "blue car" },
+      { word: "a yellow banana", emoji: "🍌", say: "A yellow banana.", key: "yellow banana" },
+      { word: "a green frog", emoji: "🐸", say: "A green frog.", key: "green frog" }
+    ],
+    video: { title: "What's Your Favorite Color? — Super Simple Songs", youtubeId: "zxIpA5nF_LY", page: "https://supersimple.com/song/whats-your-favorite-color/" },
+    chant: ["Red, red, a red apple!", "Blue, blue, a blue car!", "Yellow, yellow, a yellow banana!", "Green, green, a green frog!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What color is it?" },
+        { who: "{name}", line: "It's red!" },
+        { who: "Parent", line: "What's your favorite color?" },
+        { who: "{name}", line: "Blue!" },
+        { who: "Parent", line: "A blue car!" }
+      ],
+      activity: "Tri des couleurs : mettez les jouets en 4 tas (red, blue, yellow, green) en disant la couleur. Puis « A red ball », « A blue car »… La chanson cite aussi orange et purple : bonus."
+    },
+    skill: "Dit « a red ball », « a blue car »"
+  },
+  {
+    id: "w2d4", week: 2, day: "Thursday", title: "Move your body", emoji: "🤸", ready: true,
+    warmup: {
+      say: "Hello, {name}! Stand up! Jump! Can you jump?", key: "jump",
+      prompt: "Stand up and jump!",
+      parent: "Faites de la place pour bouger ! Montrez chaque geste en le disant, elle copie."
+    },
+    cards: [
+      { word: "jump", emoji: "🦘", say: "Jump!" },
+      { word: "run", emoji: "🏃", say: "Run!" },
+      { word: "sit down", emoji: "🪑", say: "Sit down!" },
+      { word: "stand up", emoji: "🧍", say: "Stand up!" }
+    ],
+    video: { title: "Stand Up, Sit Down — Super Simple Songs", youtubeId: "-iMGSD_35pM", page: "https://supersimple.com/song/stand-up-sit-down/" },
+    moves: [
+      { emoji: "🧍", say: "Simon says: stand up!" },
+      { emoji: "🦘", say: "Simon says: jump!" },
+      { emoji: "🪑", say: "Simon says: sit down!" },
+      { emoji: "🏃", say: "Simon says: run on the spot!" },
+      { emoji: "👏", say: "Simon says: clap your hands!" },
+      { emoji: "🧍", say: "Simon says: stand up!" }
+    ],
+    chant: ["Stand up!", "Sit down!", "Jump, jump, jump!", "Run, run, run!", "Stand up and sit down!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Can you jump?" },
+        { who: "{name}", line: "Yes!" },
+        { who: "Parent", line: "Let's jump five times!" },
+        { who: "Both", line: "One, two, three, four, five!" },
+        { who: "{name}", line: "Sit down!" }
+      ],
+      activity: "Simon Says : le renard donne les ordres, elle fait le geste pendant la barre violette. Ensuite, c'est elle qui donne les ordres à vous : « Jump! », « Sit down! »."
+    },
+    skill: "Comprend « sit down » et « stand up »"
+  },
+  {
+    id: "w2d5", week: 2, day: "Friday", title: "Animal show", emoji: "🎪", ready: true,
+    warmup: {
+      say: "Welcome to the animal show, {name}! Hello!", key: "hello",
+      prompt: "Say: Hello!",
+      parent: "Jour de spectacle ! Elle choisit 2 ou 3 animaux en peluche pour le spectacle de fin de semaine."
+    },
+    cards: [
+      { word: "a brown dog", emoji: "🐶", say: "It's a dog. It's brown. Woof woof!", key: "dog", ask: "Woof woof! Who says woof?" },
+      { word: "a yellow lion", emoji: "🦁", say: "It's a lion. It's yellow. Roar!", key: "lion", ask: "Roar! Who says roar?" },
+      { word: "a black cat", emoji: "🐈‍⬛", say: "It's a cat. It's black. Meow!", key: "cat", ask: "Meow! Who says meow?" },
+      { word: "a blue bird", emoji: "🐦", say: "It's a bird. It's blue. Tweet tweet!", key: "bird", ask: "Tweet tweet! Who says tweet?" }
+    ],
+    video: { title: "I Have A Pet — Super Simple Songs", youtubeId: "pWepfJ-8XU0", page: "https://supersimple.com/song/i-have-a-pet/" },
+    moves: [
+      { emoji: "🐶", say: "Be a dog! Woof woof!" },
+      { emoji: "🦁", say: "Be a lion! Roar!" },
+      { emoji: "🐰", say: "Jump like a rabbit!" },
+      { emoji: "🦆", say: "Walk like a duck!" },
+      { emoji: "🪑", say: "Sit down! Well done!" }
+    ],
+    chant: ["It's a dog! Woof woof!", "It's a cat! Meow!", "It's a lion! Roar!", "Jump, jump, jump!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What is it?" },
+        { who: "{name}", line: "A cat!" },
+        { who: "Parent", line: "What color is it?" },
+        { who: "{name}", line: "It's black." },
+        { who: "Parent", line: "Can you jump?" },
+        { who: "{name}", line: "Yes!" },
+        { who: "Parent", line: "Let's jump five times!" }
+      ],
+      activity: "Spectacle : elle présente chaque peluche (« It's a dog. It's brown. Woof, woof! ») et l'imite. Bilan de la semaine 2 : voir « Contrôle du vendredi » dans l'espace parent. Activité papier « Match the animal » : reliez CAT, DOG, FISH, BIRD aux dessins, ou montrez l'image quand vous dites le mot."
+    },
+    skill: "Présente un animal : « It's a dog. It's brown. »"
+  },
 
   // ---------------- WEEK 3 ----------------
   { id: "w3d1", week: 3, day: "Monday", title: "Fruits", emoji: "🍎", ready: false,

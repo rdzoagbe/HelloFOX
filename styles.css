@@ -243,3 +243,10 @@ button:focus-visible { outline: 4px solid var(--sky); outline-offset: 3px; }
 .status.hear .bar { visibility: visible; background: var(--leaf); animation: shrink 6s linear forwards; }
 
 .install-btn { display: block; width: min(560px, 100%); margin: 24px auto 0; background: var(--card); border: 3px dashed var(--sky); border-radius: var(--radius); font-size: 20px; font-weight: 800; min-height: 72px; }
+
+.status.act span { color: var(--lilac); animation: pulse .8s infinite; }
+.status.act .bar { visibility: visible; background: var(--lilac); animation: shrink 5s linear forwards; }
+.moves { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 6px 0 22px; }
+.move-card { background: #F1EEFF; border: 4px solid transparent; border-radius: 22px; padding: 12px 8px; font-size: 18px; font-weight: 800; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+.move-card .e { font-size: 56px; line-height: 1.1; }
+.move-card.heard { border-color: var(--lilac); }

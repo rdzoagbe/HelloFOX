@@ -1,6 +1,6 @@
 # Hello Fox! — beginner English PWA
 
-A tablet-friendly, installable web app. Week 1 (5 lessons) is fully playable, with a talking fox, stickers, confetti, "hear yourself" recording and the Friday speaking check.
+A tablet-friendly, installable web app. Weeks 1 and 2 (10 lessons) are fully playable, with a talking fox, stickers, confetti, "hear yourself" recording and the Friday speaking check.
 The other 19 lessons are listed and locked. Each one follows the same 5-step template.
 
 ## What's included

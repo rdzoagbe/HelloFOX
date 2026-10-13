@@ -263,7 +263,7 @@
   function status(mode) {
     const st = app.querySelector(".status"); if (!st) return;
     st.className = "status " + mode;
-    st.querySelector("span").textContent = mode === "listen" ? "👂 Listen…" : mode === "turn" ? "🗣️ Your turn!" : mode === "paused" ? "⏸️ Pause" : mode === "hear" ? "🎧 Fox is listening…" : "";
+    st.querySelector("span").textContent = mode === "listen" ? "👂 Listen…" : mode === "turn" ? "🗣️ Your turn!" : mode === "act" ? "🤸 Do it!" : mode === "paused" ? "⏸️ Pause" : mode === "hear" ? "🎧 Fox is listening…" : "";
     const bar = st.querySelector(".bar"); bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
   }
   const statusHTML = `<div class="status"><span></span><div class="bar"></div></div>`;
@@ -274,12 +274,12 @@
     if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   // One item: Fox says it, then the child gets 5 seconds to repeat (or just listens for parent lines).
-  function teach(el, say, childTurn, cb, key) {
+  function teach(el, say, childTurn, cb, key, act) {
     focus(el); status("listen");
     sayThen(say, () => {
       if (!childTurn) { status(""); later(900, cb); return; }
-      if (listenOn()) { listenFor(el, key || say, say, 0, cb); return; }
-      status("turn");
+      if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
+      status(act ? "act" : "turn");
       later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); cb(); });
     });
   }
@@ -356,7 +356,7 @@
     const next = () => {
       if (current.idx >= items.length) { focus(null); return onDone(); }
       const it = items[current.idx];
-      teach(it.el, it.say, it.turn !== false, () => { current.idx++; next(); }, it.key);
+      teach(it.el, it.say, it.turn !== false, () => { current.idx++; next(); }, it.key, it.act);
     };
     next();
   }
@@ -394,7 +394,7 @@
       ${note(L.warmup.parent + " L'écran avance tout seul : le renard parle, puis 5 secondes pour répéter.")}`, true);
     const fox = app.querySelector("[data-fox]");
     const chips = [...app.querySelectorAll(".chip")];
-    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.word })));
+    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.key || c.word })));
     const go = (from) => guide(items, from, () => {
       confetti(12);
       sayThen("Great! Now, new words!", () => later(400, () => { step = 1; renderStep(); }));
@@ -414,7 +414,7 @@
       ${note("Laissez-la répéter pendant la barre rose (5 s), avec le geste. Touchez une image pour la réentendre. Montrez le sens avant de traduire ; un mot en français si elle bloque, puis on revient à l'anglais.")}`,
       false);
     const els = [...app.querySelectorAll(".word-card")];
-    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.word }));
+    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word }));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
     els.forEach((b, i) => b.onclick = () => go(i));
     app.querySelector("[data-again]").onclick = () => { els.forEach((e) => e.classList.remove("heard")); go(0); };
@@ -459,29 +459,34 @@
       <span class="say">${esc(line(s.line))}</span><button class="mini-listen" data-line="${esc(line(s.line).replace("…", ""))}" aria-label="Listen">🔊</button></div>`).join("");
     const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
-    frame(`<h2>${gameDone ? "Let's talk!" : "Listen & tap"}</h2>${minutes()}
+    const moves = (L.moves || []).map((m) => `<div class="move-card"><span class="e" aria-hidden="true">${m.emoji}</span>${esc(m.say)}</div>`).join("");
+    frame(`<h2>${gameDone ? (moves ? "Move & talk!" : "Let's talk!") : "Listen & tap"}</h2>${minutes()}
       ${gameDone ? "" : `
         <button class="listen-btn" data-q>🔊 What do you hear?</button>
         <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.round ? "⭐" : "☆").join(" ")}</div>
         <div class="cards">${cards}</div>`}
-      ${gameDone ? `${statusHTML}<div class="script">${script}</div>
+      ${gameDone ? `${statusHTML}${moves ? `<div class="moves">${moves}</div>` : ""}<div class="script">${script}</div>
         <div class="endbar" hidden><button class="again-btn" data-again>🔁 Again</button></div>
         ${canRecord ? `<button class="rec-btn" data-rec>🎤 Say it, then hear yourself!</button>` : ""}
         ${note(L.speak.activity + (canRecord ? " Le micro enregistre 4 secondes puis rejoue sa voix. Rien n'est sauvegardé ni envoyé." : ""))}` : ""}`, gameDone);
 
     if (gameDone) {
       const lines = [...app.querySelectorAll(".script-line")];
-      const items = L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") }));
+      const mv = [...app.querySelectorAll(".move-card")];
+      const items = (L.moves || []).map((m, i) => ({ el: mv[i], say: m.say, act: true }))
+        .concat(L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") })));
+      mv.forEach((m, i) => m.onclick = () => go(i));
       const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
-      app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(i));
+      app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(mv.length + i));
       app.querySelector("[data-again]").onclick = () => go(0);
       const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => { run++; focus(null); status(""); recordMe(rec); };
-      sayThen("Now, let's talk!", () => go(0));
+      sayThen(mv.length ? "Let's move!" : "Now, let's talk!", () => go(0));
       return;
     }
     const target = order[play.round];
     let firstTry = true;
-    const ask = () => speak(L.cards[target].say);
+    const tc = L.cards[target];
+    const ask = () => speak(tc.ask && play.round % 2 === 1 ? tc.ask : tc.say);
     setTimeout(ask, play.round === 0 ? 1800 : 300);
     if (play.round === 0) speak(STEP_SAY[3]);
     app.querySelector("[data-q]").onclick = ask;
