@@ -421,10 +421,14 @@
         <p class="small">${t("s_ready_tip")}</p>
         <div class="s-actions"><button class="s-ghost" data-go="3">${t("back")}</button><button class="s-primary big" data-done>${t("s_go")}</button></div>`
     ];
-    app.innerHTML = `<div class="setup"><div class="setup-top"><div class="s-dots" aria-label="${t("s_step", { n: setupStep + 1 })}">${dots}</div>${langSwitch()}</div>
+    // Back to the landing page (browser only: in the installed app, setup is the first screen)
+    const homeBtn = standalone() ? "" : `<button class="icon-btn" data-landing aria-label="${t("back_home")}">${ICON.home}</button>`;
+    app.innerHTML = `<div class="setup"><div class="setup-top">${homeBtn}<div class="s-dots" aria-label="${t("s_step", { n: setupStep + 1 })}">${dots}</div>${langSwitch()}</div>
       <section class="s-card">${pages[setupStep]()}${setupMsg ? `<p class="s-msg" role="alert">${esc(setupMsg)}</p>` : ""}</section></div>`;
     setupMsg = "";
     bindLang(renderSetup);
+    const lb = app.querySelector("[data-landing]");
+    if (lb) lb.onclick = () => { try { sessionStorage.removeItem("hf-browser"); } catch (e) { } setupStep = 0; renderLanding(); window.scrollTo(0, 0); };
     const go = (n) => { setupStep = n; renderSetup(); };
     app.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(Number(b.dataset.go)));
     const fail = (m) => { setupMsg = m; renderSetup(); };

@@ -549,3 +549,5 @@ h1, h2, .brand, .word-card, .prompt, .big-start .s-main, .next-btn, .listen-btn,
 .top-lang { display: flex; justify-content: flex-end; }
 .setup-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .setup-top .s-dots { margin: 0; }
+.setup-top .icon-btn { width: 60px; height: 60px; min-height: 60px; flex: none; }
+.setup-top .s-dots { flex: 1; }

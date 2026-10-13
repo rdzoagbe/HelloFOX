@@ -2,7 +2,7 @@
 // {name}-style placeholders are filled by t(key, {name: ...}). Values may contain simple HTML (<b>).
 window.I18N = {
   en: {
-    lang_label: "Language",
+    lang_label: "Language", back_home: "Back to the home page",
     // landing
     l_tag: "Learn English by playing with a friendly fox. For beginners aged 6 to 8.",
     l_c1_t: "The fox leads the way", l_c1: "Fox says each word, waits for your child to repeat it, then moves on. Almost nothing to read.",
@@ -101,7 +101,7 @@ window.I18N = {
     t_listen_on: "Fox listens: on", t_listen_off: "Fox listens: off", t_erased: "Progress erased"
   },
   fr: {
-    lang_label: "Langue",
+    lang_label: "Langue", back_home: "Retour à la page d'accueil",
     l_tag: "L'anglais en jouant avec un renard, pour les enfants de 6 à 8 ans qui débutent.",
     l_c1_t: "Le renard guide", l_c1: "Il dit chaque mot, attend que l'enfant répète, puis passe au suivant. Presque rien à lire.",
     l_c2_t: "20 leçons, 4 semaines", l_c2: "Bonjour, couleurs, animaux, nourriture, famille. Chansons, jeux, autocollants et diplôme.",
