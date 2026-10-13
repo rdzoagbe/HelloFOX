@@ -292,7 +292,7 @@
     if (app.querySelector(".landing")) renderLanding();
   });
   window.addEventListener("appinstalled", () => {
-    installEvt = null; toast("Hello Fox est installé ✓");
+    installEvt = null; toast("Hello Fox is installed ✓");
     if (app.querySelector("[data-start]")) renderHome();
     if (app.querySelector(".landing")) renderLanding(true);
   });
@@ -315,37 +315,38 @@
     hush();
     const ios = isIOS();
     const steps = ios
-      ? [[SHARE_SVG, "Touchez <b>Partager</b> en haut (ou en bas) de Safari."], [PLUS_SVG, "Choisissez <b>Sur l'écran d'accueil</b>."], [foxSVG("happy", 34), "Touchez <b>Ajouter</b>, puis ouvrez <b>Hello Fox</b> depuis l'écran d'accueil."]]
-      : [[DOTS_SVG, "Dans Chrome, touchez le menu <b>⋮</b> en haut à droite."], [PLUS_SVG, "Choisissez <b>Installer l'application</b> (ou <b>Ajouter à l'écran d'accueil</b>)."], [foxSVG("happy", 34), "Ouvrez <b>Hello Fox</b> depuis l'écran d'accueil."]];
+      ? [[SHARE_SVG, "Tap <b>Share</b> at the top (or bottom) of Safari."], [PLUS_SVG, "Choose <b>Add to Home Screen</b>."], [foxSVG("happy", 34), "Tap <b>Add</b>, then open <b>Hello Fox</b> from the home screen."]]
+      : [[DOTS_SVG, "In Chrome, tap the <b>⋮</b> menu at the top right."], [PLUS_SVG, "Choose <b>Install app</b> (or <b>Add to Home screen</b>)."], [foxSVG("happy", 34), "Open <b>Hello Fox</b> from the home screen."]];
+    document.documentElement.lang = "en";
     app.innerHTML = `<div class="landing">
       <section class="l-hero">
         ${foxSVG("happy", 170)}
         <h1>Hello Fox!</h1>
-        <p class="l-tag">L'anglais en jouant avec un renard, pour les enfants de 6 à 8 ans qui débutent.</p>
+        <p class="l-tag">Learn English by playing with a friendly fox. For beginners aged 6 to 8.</p>
       </section>
       <section class="l-cards">
-        <div class="l-card"><h2>Le renard guide</h2><p>Il dit chaque mot, attend que l'enfant répète, puis passe au suivant. Presque rien à lire.</p></div>
-        <div class="l-card"><h2>20 leçons, 4 semaines</h2><p>Bonjour, couleurs, animaux, nourriture, famille. Chansons, jeux, autocollants et diplôme.</p></div>
-        <div class="l-card"><h2>Le parent décide</h2><p>Code parent, temps d'écran, votre propre voix, suivi des progrès, sauvegarde.</p></div>
+        <div class="l-card"><h2>The fox leads the way</h2><p>Fox says each word, waits for your child to repeat it, then moves on. Almost nothing to read.</p></div>
+        <div class="l-card"><h2>20 lessons, 4 weeks</h2><p>Greetings, colours, animals, food and family. Songs, games, stickers and a certificate.</p></div>
+        <div class="l-card"><h2>Parents stay in charge</h2><p>Parent code, screen-time limit, your own voice, progress tracking and backups.</p></div>
       </section>
       <section class="l-install" id="install">
-        <h2>${justInstalled ? "C'est installé !" : "1. Installez Hello Fox sur la tablette"}</h2>
-        ${justInstalled ? `<p>Fermez cette page et ouvrez <b>Hello Fox</b> depuis l'écran d'accueil. La configuration commencera là.</p>`
-          : installEvt ? `<button class="big-start" data-install><span class="play-dot">${PLUS_SVG}</span><span class="s-text"><span class="s-main">Installer Hello Fox</span><span class="s-sub">Gratuit · sans compte · sans publicité</span></span></button>`
+        <h2>${justInstalled ? "Installed!" : "1. Install Hello Fox on the tablet"}</h2>
+        ${justInstalled ? `<p>Close this page and open <b>Hello Fox</b> from the home screen. Setup starts there.</p>`
+          : installEvt ? `<button class="big-start" data-install><span class="play-dot">${PLUS_SVG}</span><span class="s-text"><span class="s-main">Install Hello Fox</span><span class="s-sub">Free · no account · no ads</span></span></button>`
           : `<ol class="l-steps">${steps.map(([ic, t], i) => `<li><span class="l-num">${i + 1}</span><span class="l-ic">${ic}</span><span>${t}</span></li>`).join("")}</ol>
-             ${ios ? `<p class="small">Sur iPad et iPhone, utilisez Safari. Important : faites la configuration <b>dans l'appli installée</b>, pas ici (Safari et l'appli ne partagent pas leurs données).</p>`
-                   : `<p class="small">Utilisez Chrome. Si le lien s'est ouvert dans WhatsApp, Facebook ou Gmail : menu → « Ouvrir dans Chrome ».</p>`}`}
-        <h2 class="l-h2b">2. Ouvrez l'appli et configurez-la</h2>
-        <p>Au premier lancement : votre code parent, le prénom de l'enfant et le temps d'écran. Deux minutes, puis vous lui donnez la tablette.</p>
+             ${ios ? `<p class="small">On iPad and iPhone, use Safari. Important: do the setup <b>in the installed app</b>, not here (Safari and the app don't share their data).</p>`
+                   : `<p class="small">Use Chrome. If the link opened inside WhatsApp, Facebook or Gmail, use the menu → “Open in Chrome”.</p>`}`}
+        <h2 class="l-h2b">2. Open the app and set it up</h2>
+        <p>On first launch: your parent code, your child's name and screen time. Two minutes, then hand over the tablet.</p>
       </section>
       <section class="l-privacy">
-        <h2>Confidentialité</h2>
-        <ul><li>Pas de compte, pas de publicité, pas de statistiques.</li>
-          <li>Les prénoms et les progrès restent sur cette tablette.</li>
-          <li>Les vidéos (Super Simple Songs) se lancent seulement après votre accord, dans un lecteur YouTube qui ne peut pas ouvrir d'autres pages.</li>
-          <li>Site familial, non commercial, non affilié à Super Simple ni au British Council.</li></ul>
+        <h2>Privacy</h2>
+        <ul><li>No account, no ads, no tracking.</li>
+          <li>Names and progress stay on this tablet.</li>
+          <li>Videos (Super Simple Songs) only start after a parent agrees, in a YouTube player that can't open other pages.</li>
+          <li>A family, non-commercial site, not affiliated with Super Simple or the British Council.</li></ul>
       </section>
-      <button class="l-browser" data-browser>Continuer dans le navigateur (parents)</button>
+      <button class="l-browser" data-browser>Continue in the browser (parents)</button>
     </div>`;
     const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
     app.querySelector("[data-browser]").onclick = () => { try { sessionStorage.setItem("hf-browser", "1"); } catch (e) { } setupStep = 0; renderSetup(); };
