@@ -36,7 +36,13 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
   const errs = [];
   const watch = (p, name) => {
     p.on("pageerror", (e) => errs.push(`[${name}] ${e.message}`));
-    p.on("console", (m) => m.type() === "error" && !/youtube|net::|ERR_|sessionStorage/i.test(m.text()) && errs.push(`[${name}] ${m.text()}`));
+    // Only count errors from Hello Fox's own files, not from inside the YouTube player
+    p.on("console", (m) => {
+      const from = (m.location() && m.location().url) || "";
+      if (m.type() !== "error" || /youtube|net::|ERR_|sessionStorage|Permissions policy violation/i.test(m.text() + " " + from)) return;
+      if (from && !from.startsWith("http://localhost")) return;
+      errs.push(`[${name}] ${m.text()}`);
+    });
   };
   const newPage = async (name, opts = {}, store) => {
     const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, permissions: ["microphone"], ...opts });
