@@ -52,7 +52,53 @@
     u.rate = rate || 0.8; u.pitch = pitch || 1.1;
     return u;
   }
+  // ---------- parent's own voice (recorded in the parent area, stored only on this device) ----------
+  const voices = new Map(); // text -> object URL
+  let nowAudio = null;
+  function idb() {
+    return new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error("no idb"));
+      const r = indexedDB.open("hellofox", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("voice");
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  async function voiceAll() {
+    try {
+      const db = await idb();
+      await new Promise((res) => {
+        const tx = db.transaction("voice"), st = tx.objectStore("voice"), c = st.openCursor();
+        c.onsuccess = () => { const cur = c.result; if (!cur) return res(); voices.set(cur.key, URL.createObjectURL(cur.value)); cur.continue(); };
+        c.onerror = () => res();
+      });
+    } catch (e) { /* storage blocked: TTS only */ }
+  }
+  async function voicePut(text, blob) {
+    const db = await idb();
+    await new Promise((res, rej) => { const tx = db.transaction("voice", "readwrite"); tx.objectStore("voice").put(blob, text); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    if (voices.has(text)) URL.revokeObjectURL(voices.get(text));
+    voices.set(text, URL.createObjectURL(blob));
+  }
+  async function voiceDel(text) {
+    const db = await idb();
+    await new Promise((res) => { const tx = db.transaction("voice", "readwrite"); tx.objectStore("voice").delete(text); tx.oncomplete = res; tx.onerror = res; });
+    if (voices.has(text)) URL.revokeObjectURL(voices.get(text));
+    voices.delete(text);
+  }
+  function stopAudio() { if (nowAudio) { try { nowAudio.pause(); } catch (e) { } nowAudio = null; } }
+  // Plays the parent's recording for this exact text if there is one. Returns true if it did.
+  function playVoice(text, onEnd) {
+    const url = voices.get(text); if (!url) return false;
+    stopAudio(); if (hasTTS) speechSynthesis.cancel();
+    const a = new Audio(url); nowAudio = a;
+    a.onended = a.onerror = () => { if (nowAudio === a) nowAudio = null; onEnd && onEnd(); };
+    a.play().catch(() => onEnd && onEnd());
+    return true;
+  }
+
   function speak(text) {
+    if (playVoice(text)) return;
+    stopAudio();
     if (!hasTTS) return;
     speechSynthesis.cancel();
     speechSynthesis.speak(utter(text));
@@ -69,7 +115,7 @@
     };
     next();
   }
-  const hush = () => { run++; current = null; if (typeof stopListening === "function") stopListening(); if (hasTTS) speechSynthesis.cancel(); if (typeof setPaused === "function") setPaused(false); };
+  const hush = () => { run++; current = null; if (typeof stopAudio === "function") stopAudio(); if (typeof stopListening === "function") stopListening(); if (hasTTS) speechSynthesis.cancel(); if (typeof setPaused === "function") setPaused(false); };
 
   // ---------- small helpers ----------
   let toastTimer;
@@ -171,13 +217,15 @@
         <button class="mascot-btn" data-fox aria-label="Fox"><span class="mascot">🦊</span></button>
         <h1>Hello, ${esc(childName())}!</h1>
         <p>Let's learn English together.</p>
-        <button class="big-start" data-start>▶ Start today's lesson
+        ${allDone() ? `<button class="cert-btn" data-cert>🏆 My certificate</button>` : ""}
+        <button class="big-start" data-start>▶ ${allDone() ? "Play again" : "Start today's lesson"}
           <small>${next ? esc(next.emoji + " " + next.title) : ""}</small></button>
       </section>
       ${weeks}
       ${installEvt && !standalone() ? `<button class="install-btn" data-install>📲 Installer Hello Fox sur cet appareil</button>` : ""}`;
 
     const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
+    const ce = app.querySelector("[data-cert]"); if (ce) ce.onclick = renderCertificate;
     app.querySelector("[data-start]").onclick = () => startLesson(next.id);
     app.querySelector("[data-fox]").onclick = () => speak(`Hello, ${childName()}! I'm Fox. Let's play!`);
     app.querySelector("[data-stickers]").onclick = renderStickers;
@@ -186,6 +234,31 @@
       const l = LESSONS.find((x) => x.id === b.dataset.lesson);
       if (l.ready) startLesson(l.id); else { speak("Soon!"); toast("Bientôt disponible"); }
     });
+  }
+
+  // =================== CERTIFICATE (after the 20 lessons) ===================
+  const allDone = () => LESSONS.filter((l) => l.ready).every((l) => isDone(l.id));
+  function renderCertificate() {
+    hush();
+    const dates = Object.values(state.lessons).map((x) => x.completedAt).filter(Boolean).sort();
+    const end = dates.length ? new Date(dates[dates.length - 1]) : new Date();
+    app.innerHTML = `
+      <div class="topbar print-hide"><button class="icon-btn" data-home aria-label="Home">🏠</button>
+        <button class="sticker-btn" data-print>🖨️ Print</button></div>
+      <section class="cert">
+        <div class="cert-fox">🦊</div>
+        <div class="cert-kicker">Certificate</div>
+        <h1>${esc(state.name || "Super learner")}</h1>
+        <p class="cert-line">finished <b>Hello Fox! English</b></p>
+        <p class="cert-sub">4 weeks · 20 lessons · ${state.stars} ⭐</p>
+        <div class="cert-stickers">${STICKERS.slice(0, stickerCount()).map((x) => x.e).join(" ")}</div>
+        <p class="cert-date">${end.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
+        <p class="cert-words">Hello · My name is… · I'm happy · one, two, three · red, blue · cat, dog · jump · apple, please · thank you · this is my mum · I like…</p>
+      </section>`;
+    confetti(40); chime(true);
+    speak(`Congratulations, ${childName()}! You did it! Well done!`);
+    app.querySelector("[data-home]").onclick = renderHome;
+    app.querySelector("[data-print]").onclick = () => window.print();
   }
 
   // =================== STICKER BOOK ===================
@@ -200,9 +273,11 @@
         <div class="stars-pill">⭐ ${state.stars}</div></div>
       <section class="stage"><h2>My stickers</h2>
         <div class="minutes">${n < STICKERS.length ? `Encore ${toNext} ⭐ pour le prochain autocollant` : "Collection complète ! 🎉"}</div>
-        <div class="sticker-grid">${grid}</div></section>`;
+        <div class="sticker-grid">${grid}</div>
+        ${allDone() ? `<div class="endbar"><button class="big-start" data-cert>🏆 My certificate</button></div>` : ""}</section>`;
     speak(n ? "Your stickers! Tap and say the word!" : "Finish a lesson to get a sticker!");
     app.querySelector("[data-home]").onclick = renderHome;
+    const cb = app.querySelector("[data-cert]"); if (cb) cb.onclick = renderCertificate;
     app.querySelectorAll("[data-w]").forEach((b) => b.onclick = () => { speak(b.dataset.w + "!"); b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle"); });
   }
 
@@ -211,7 +286,7 @@
   function startLesson(id) {
     L = LESSONS.find((l) => l.id === id);
     step = 0;
-    play = { round: 0, order: null, rating: null };
+    play = { round: 0, order: null, rating: null, gameDone: false, miss: 0 };
     renderStep();
   }
 
@@ -252,6 +327,8 @@
     const my = run;
     let done = false;
     const fin = () => { if (done || my !== run) return; done = true; cb(); };
+    if (playVoice(text, fin)) { setTimeout(fin, 9000); return; }
+    stopAudio();
     if (!hasTTS) { setTimeout(fin, 1200); return; }
     speechSynthesis.cancel();
     const u = utter(text, null, rate);
@@ -368,7 +445,7 @@
   }
   function togglePause() {
     if (!paused) {
-      run++; stopListening(); if (hasTTS) speechSynthesis.cancel();
+      run++; stopListening(); stopAudio(); if (hasTTS) speechSynthesis.cancel();
       setPaused(true); status("paused");
     } else if (current) {
       guide(current.items, current.idx, current.onDone); // restart the word she was on
@@ -445,65 +522,142 @@
     app.querySelector("[data-alt]").onclick = () => speakLines(L.chant || L.cards.map((c) => c.say));
   }
 
-  // 4. Play: listen & tap game, then the dialogue with "hear myself"
+  // 4. Play: a game (tap / café / memory / what's missing), then moves + dialogue with "hear myself"
   function stepPlay() {
-    const ROUNDS = L.cards.length;
-    const gameDone = play.round >= ROUNDS;
-    const order = play.order || (play.order = shuffle(L.cards.map((_, i) => i)));
-    const cards = shuffle(L.cards.map((c, i) => ({ c, i }))).map(({ c, i }) =>
-      `<button class="word-card" data-i="${i}"><span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`).join("");
+    const g = (L.game && L.game.type) || "tap";
+    if (!play.gameDone) {
+      if (g === "memory") return memoryGame();
+      if (g === "missing") return missingGame();
+      return tapGame(g === "cafe");
+    }
+    talkPart();
+  }
+  function gameOver() { play.gameDone = true; later(1300, stepPlay); }
+  const cardBtn = (c, i, cls) => `<button class="word-card ${cls || ""}" data-i="${i}"><span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`;
+
+  // Listen & tap — or Fox's café, where Fox orders and she serves
+  function tapGame(cafe) {
+    const items = (L.game && L.game.items) || L.cards;
+    const ROUNDS = Math.min(items.length, 5);
+    const order = play.order || (play.order = shuffle(items.map((_, i) => i)).slice(0, ROUNDS));
+    if (play.round >= ROUNDS) { play.gameDone = true; return stepPlay(); }
+    const cards = shuffle(items.map((c, i) => ({ c, i }))).map(({ c, i }) => cardBtn(c, i)).join("");
+    frame(`<h2>${cafe ? "☕ Fox's café" : "Listen & tap"}</h2>${minutes()}
+      ${cafe ? `<div class="cafe-fox" aria-hidden="true">🦊<span>☕</span></div>` : ""}
+      <button class="listen-btn" data-q>🔊 ${cafe ? "What does Fox want?" : "What do you hear?"}</button>
+      <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.round ? "⭐" : "☆").join(" ")}</div>
+      <div class="cards">${cards}</div>
+      ${cafe ? note("Le renard est le client : il commande, elle sert en touchant le bon aliment. Ensuite, à la maison, inversez : elle commande, vous servez.") : ""}`, false);
+    const it = items[order[play.round]];
+    let firstTry = true;
+    const ask = () => speak(cafe ? (it.order || it.say) : (it.ask && play.round % 2 === 1 ? it.ask : it.say));
+    if (play.round === 0) sayThen(cafe ? "Welcome to my café! I'm hungry!" : STEP_SAY[3], () => later(300, ask));
+    else later(300, ask);
+    app.querySelector("[data-q]").onclick = ask;
+    app.querySelectorAll(".word-card").forEach((b) => b.onclick = () => {
+      if (play.locked) return;
+      if (items[Number(b.dataset.i)] === it) {
+        play.locked = true;
+        b.classList.add("right"); chime(true); confetti(firstTry ? 10 : 5);
+        speak(cafe ? ["Thank you!", "Yummy! Thank you!", "Thank you very much!"][play.round % 3] : PRAISE[play.round % PRAISE.length]);
+        play.round++;
+        later(1300, () => { play.locked = false; stepPlay(); });
+      } else {
+        firstTry = false; b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong");
+        chime(false); later(500, ask);
+      }
+    });
+  }
+
+  // Memory: find the pairs. Each turned card says its word.
+  function memoryGame() {
+    const cards = L.cards.slice(0, 4);
+    const tiles = shuffle(cards.concat(cards).map((c, k) => ({ c, k: k % cards.length })));
+    frame(`<h2>Find the pairs!</h2>${minutes()}
+      <div class="mem-grid">${tiles.map((t, i) => `<button class="mem" data-t="${i}" aria-label="card"><span class="back">🦊</span>
+        <span class="front"><span class="e">${t.c.emoji}</span>${esc(t.c.word)}</span></button>`).join("")}</div>
+      ${note("Jeu de mémoire : elle retourne deux cartes. Chaque carte dit son mot : faites-la répéter. Une paire trouvée = le renard dit la phrase entière.")}`, false);
+    sayThen("Find the pairs!", () => { });
+    let open = [], found = 0, busy = false;
+    app.querySelectorAll(".mem").forEach((b) => b.onclick = () => {
+      const t = tiles[Number(b.dataset.t)];
+      if (busy || b.classList.contains("up")) return;
+      b.classList.add("up"); speak(t.c.word);
+      open.push({ b, t });
+      if (open.length < 2) return;
+      busy = true;
+      const [x, y] = open; open = [];
+      if (x.t.k === y.t.k) {
+        later(500, () => {
+          x.b.classList.add("matched"); y.b.classList.add("matched"); chime(true); confetti(8);
+          sayThen(x.t.c.say, () => {
+            busy = false; found++;
+            if (found === cards.length) { confetti(20); sayThen("Well done! All the pairs!", gameOver); }
+          });
+        });
+      } else {
+        later(1200, () => { x.b.classList.remove("up"); y.b.classList.remove("up"); busy = false; });
+      }
+    });
+  }
+
+  // What's missing? Look, close your eyes, one picture disappears, find it.
+  function missingGame() {
+    const ROUNDS = 3;
+    play.miss = play.miss || 0;
+    if (play.miss >= ROUNDS) { play.gameDone = true; return stepPlay(); }
+    const shown = L.cards.slice(0, 4);
+    const gone = Math.floor(Math.random() * shown.length);
+    frame(`<h2>What's missing?</h2>${minutes()}
+      <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.miss ? "⭐" : "☆").join(" ")}</div>
+      <div class="cards look">${shown.map((c, i) => cardBtn(c, i, "still")).join("")}</div>
+      <div class="cover" hidden><span>🙈</span>Close your eyes!</div>
+      <div class="pick" hidden><div class="prompt">❓ What's missing?</div><div class="pick-row">${shuffle(shown.map((c, i) => ({ c, i }))).map(({ c, i }) =>
+        `<button class="chip" data-p="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div></div>
+      ${note("Regardez les images ensemble, nommez-les. Elle ferme les yeux pendant que l'écran se cache, puis trouve l'image disparue. À refaire avec de vrais objets sur la table.")}`, false);
+    const look = app.querySelector(".look"), cover = app.querySelector(".cover"), pick = app.querySelector(".pick");
+    sayThen(play.miss === 0 ? "Look! Remember the pictures!" : "Look again!", () => later(2500, () => {
+      cover.hidden = false;
+      sayThen("Close your eyes!", () => later(2500, () => {
+        const el = look.querySelectorAll(".word-card")[gone];
+        el.classList.add("hidden-card"); el.innerHTML = `<span class="e">❓</span>&nbsp;`;
+        cover.hidden = true; pick.hidden = false;
+        sayThen("Open your eyes! What's missing?", () => { });
+      }));
+    }));
+    app.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => {
+      if (Number(b.dataset.p) === gone) {
+        b.classList.add("right"); chime(true); confetti(10);
+        sayThen("Yes! " + shown[gone].say, () => { play.miss++; later(500, stepPlay); });
+      } else {
+        b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong"); chime(false); speak("Look again!");
+      }
+    });
+  }
+
+  function talkPart() {
     // Without a saved name: speaker shows "Me" and the line says "My name is …"
     const who = (w) => w === "{name}" ? "🙋‍♀️ " + (state.name || "Me") : w === "Parent" ? "👨 Parent" : "👫 Both";
     const line = (t) => state.name ? fill(t) : t.replace(/\{name\}\.?/g, "…");
     const script = L.speak.script.map((s) => `<div class="script-line"><span class="who">${esc(who(s.who))}</span>
       <span class="say">${esc(line(s.line))}</span><button class="mini-listen" data-line="${esc(line(s.line).replace("…", ""))}" aria-label="Listen">🔊</button></div>`).join("");
     const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
-
     const moves = (L.moves || []).map((m) => `<div class="move-card"><span class="e" aria-hidden="true">${m.emoji}</span>${esc(m.say)}</div>`).join("");
-    frame(`<h2>${gameDone ? (moves ? "Move & talk!" : "Let's talk!") : "Listen & tap"}</h2>${minutes()}
-      ${gameDone ? "" : `
-        <button class="listen-btn" data-q>🔊 What do you hear?</button>
-        <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.round ? "⭐" : "☆").join(" ")}</div>
-        <div class="cards">${cards}</div>`}
-      ${gameDone ? `${statusHTML}${moves ? `<div class="moves">${moves}</div>` : ""}<div class="script">${script}</div>
-        <div class="endbar" hidden><button class="again-btn" data-again>🔁 Again</button></div>
-        ${canRecord ? `<button class="rec-btn" data-rec>🎤 Say it, then hear yourself!</button>` : ""}
-        ${note(L.speak.activity + (canRecord ? " Le micro enregistre 4 secondes puis rejoue sa voix. Rien n'est sauvegardé ni envoyé." : ""))}` : ""}`, gameDone);
-
-    if (gameDone) {
-      const lines = [...app.querySelectorAll(".script-line")];
-      const mv = [...app.querySelectorAll(".move-card")];
-      const items = (L.moves || []).map((m, i) => ({ el: mv[i], say: m.say, act: true }))
-        .concat(L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") })));
-      mv.forEach((m, i) => m.onclick = () => go(i));
-      const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
-      app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(mv.length + i));
-      app.querySelector("[data-again]").onclick = () => go(0);
-      const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => { run++; focus(null); status(""); recordMe(rec); };
-      sayThen(mv.length ? "Let's move!" : "Now, let's talk!", () => go(0));
-      return;
-    }
-    const target = order[play.round];
-    let firstTry = true;
-    const tc = L.cards[target];
-    const ask = () => speak(tc.ask && play.round % 2 === 1 ? tc.ask : tc.say);
-    setTimeout(ask, play.round === 0 ? 1800 : 300);
-    if (play.round === 0) speak(STEP_SAY[3]);
-    app.querySelector("[data-q]").onclick = ask;
-    app.querySelectorAll(".word-card").forEach((b) => b.onclick = () => {
-      if (play.locked) return;
-      const i = Number(b.dataset.i);
-      if (i === target) {
-        play.locked = true;
-        b.classList.add("right"); chime(true); confetti(firstTry ? 10 : 5);
-        speak(PRAISE[play.round % PRAISE.length]);
-        play.round++;
-        setTimeout(() => { play.locked = false; stepPlay(); }, 1200);
-      } else {
-        firstTry = false; b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong");
-        chime(false); setTimeout(ask, 500);
-      }
-    });
+    frame(`<h2>${moves ? "Move & talk!" : "Let's talk!"}</h2>${minutes()}
+      ${statusHTML}${moves ? `<div class="moves">${moves}</div>` : ""}<div class="script">${script}</div>
+      <div class="endbar" hidden><button class="again-btn" data-again>🔁 Again</button></div>
+      ${canRecord ? `<button class="rec-btn" data-rec>🎤 Say it, then hear yourself!</button>` : ""}
+      ${note(L.speak.activity + (canRecord ? " Le micro enregistre 4 secondes puis rejoue sa voix. Rien n'est sauvegardé ni envoyé." : ""))}`, true);
+    const lines = [...app.querySelectorAll(".script-line")];
+    const mv = [...app.querySelectorAll(".move-card")];
+    const items = (L.moves || []).map((m, i) => ({ el: mv[i], say: m.say, act: true }))
+      .concat(L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") })));
+    const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
+    mv.forEach((m, i) => m.onclick = () => go(i));
+    app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(mv.length + i));
+    app.querySelector("[data-again]").onclick = () => go(0);
+    const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => { run++; focus(null); status(""); recordMe(rec); };
+    sayThen(mv.length ? "Let's move!" : "Now, let's talk!", () => go(0));
   }
 
   // "Hear myself": records ~4 s in memory, plays it back, then discards it. Nothing is saved or uploaded.
@@ -606,6 +760,10 @@
           <li><b>iPad / iPhone (Safari)</b> : bouton <b>Partager</b> (carré avec flèche) → <b>Sur l'écran d'accueil</b> → <b>Ajouter</b>.</li>
           <li>Utilisez Chrome sur Android (pas le navigateur Samsung ni une appli comme Facebook / WhatsApp qui ouvre le lien à l'intérieur).</li>
         </ul></section>`}
+      <section class="panel"><h2>🎙️ Ma voix</h2>
+        <p class="small">Enregistrez chaque mot avec votre voix : le renard l'utilisera à la place de la voix robot. Les enregistrements restent sur cette tablette (jamais envoyés). 3 secondes par mot.</p>
+        <select id="vl" class="vl">${LESSONS.filter((l) => l.ready).map((l) => `<option value="${l.id}">S${l.week} ${esc(l.day.slice(0, 3))} · ${esc(l.title)}</option>`).join("")}</select>
+        <div id="vrows"></div></section>
       <section class="panel"><h2>🎧 Fox listens</h2>
         ${SR ? `<label class="skill"><input type="checkbox" data-listen ${state.listen ? "checked" : ""}> Le renard écoute si elle répète le mot</label>
         <p class="small">Désactivé par défaut. Quand c'est activé, la tablette utilise la reconnaissance vocale du navigateur : sur la plupart des tablettes, la voix est envoyée aux serveurs de Google (Chrome / Android) ou d'Apple (Safari / iPad) pour être transformée en texte. Rien n'est enregistré par Hello Fox. La reconnaissance se trompe souvent avec les voix d'enfants : le renard ne dit jamais « faux », il fait réécouter une fois puis passe au mot suivant. À utiliser avec vous à côté d'elle.</p>`
@@ -620,7 +778,7 @@
       <section class="panel"><h2>Leçons</h2>
         <table><thead><tr><th>Jour</th><th>Leçon</th><th>Faite</th><th>Compétence</th></tr></thead><tbody>${rows}</tbody></table>
         <p class="small">Étoiles : ${state.stars} · Autocollants : ${stickerCount()}/${STICKERS.length}</p>
-        <div class="row-btns"><button data-export>Exporter (fichier)</button><button class="danger" data-reset>Réinitialiser</button></div></section>
+        <div class="row-btns"><button data-certprev>🏆 Aperçu du diplôme</button><button data-export>Exporter (fichier)</button><button class="danger" data-reset>Réinitialiser</button></div></section>
       <section class="panel"><h2>Petites habitudes qui font la différence</h2>
         <ul class="small tips"><li>Revoir les mots d'hier avant d'en apprendre de nouveaux.</li>
         <li>Lui donner des raisons de parler : « Apple or banana? » et attendre quelques secondes.</li>
@@ -635,6 +793,36 @@
 
     app.querySelector("[data-home]").onclick = renderHome;
     const i2 = app.querySelector("[data-install2]"); if (i2) i2.onclick = doInstall;
+    const vl = app.querySelector("#vl");
+    const vrows = () => {
+      const l = LESSONS.find((x) => x.id === vl.value);
+      const texts = [];
+      const add = (t, label) => { if (t && !texts.some((x) => x.t === t)) texts.push({ t, label }); };
+      l.cards.forEach((c) => { add(c.say, c.emoji + " " + c.word); if (c.ask) add(c.ask, c.emoji + " " + c.ask); });
+      ((l.game && l.game.items) || l.cards).forEach((c) => add(c.order, c.emoji + " " + c.order));
+      app.querySelector("#vrows").innerHTML = texts.map((x, i) => `<div class="vrow"><span class="vtxt">${esc(x.label)}<small>${esc(x.t)}</small></span>
+        <button data-vp="${i}" aria-label="Écouter">▶️</button><button data-vr="${i}" class="${voices.has(x.t) ? "has" : ""}">${voices.has(x.t) ? "🔁" : "⏺️"}</button>
+        ${voices.has(x.t) ? `<button data-vd="${i}" aria-label="Supprimer">🗑️</button>` : ""}</div>`).join("");
+      app.querySelectorAll("[data-vp]").forEach((b) => b.onclick = () => speak(texts[b.dataset.vp].t));
+      app.querySelectorAll("[data-vd]").forEach((b) => b.onclick = async () => { await voiceDel(texts[b.dataset.vd].t); vrows(); });
+      app.querySelectorAll("[data-vr]").forEach((b) => b.onclick = async () => {
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+        catch (e) { toast("Micro non autorisé."); return; }
+        const chunks = [], rec = new MediaRecorder(stream);
+        rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+        rec.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          try { await voicePut(texts[b.dataset.vr].t, new Blob(chunks, { type: rec.mimeType || "audio/mp4" })); toast("Enregistré ✓"); }
+          catch (e) { toast("Impossible d'enregistrer sur cet appareil."); }
+          vrows(); speak(texts[b.dataset.vr].t);
+        };
+        b.textContent = "🔴"; b.disabled = true; rec.start();
+        setTimeout(() => rec.state !== "inactive" && rec.stop(), 3000);
+      });
+    };
+    if (vl) { vl.onchange = vrows; vrows(); }
+    const cp = app.querySelector("[data-certprev]"); if (cp) cp.onclick = renderCertificate;
     const lt = app.querySelector("[data-listen]");
     if (lt) lt.onchange = () => { state.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? "Fox listens : activé" : "Fox listens : désactivé"); };
     app.querySelector("[data-savename]").onclick = () => {
@@ -657,6 +845,7 @@
 
   // ---------- boot ----------
   renderHome();
+  voiceAll();
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   }

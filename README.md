@@ -1,6 +1,6 @@
 # Hello Fox! — beginner English PWA
 
-A tablet-friendly, installable web app. Weeks 1 and 2 (10 lessons) are fully playable, with a talking fox, stickers, confetti, "hear yourself" recording and the Friday speaking check.
+A tablet-friendly, installable web app for a 6-year-old French-speaking beginner. The full 4-week course (20 lessons) is playable: talking fox with guided 5-second turns, pause, optional "Fox listens" speech check, games (listen & tap, Fox's café, memory pairs, what's missing?, Simon says), sticker book, parent voice recordings, Friday speaking check and a printable certificate.
 The other 19 lessons are listed and locked. Each one follows the same 5-step template.
 
 ## What's included

@@ -305,29 +305,323 @@ window.LESSONS = [
     skill: "Présente un animal : « It's a dog. It's brown. »"
   },
 
-  // ---------------- WEEK 3 ----------------
-  { id: "w3d1", week: 3, day: "Monday", title: "Fruits", emoji: "🍎", ready: false,
-    words: ["apple", "banana", "orange", "grapes"], target: "An apple, please." },
-  { id: "w3d2", week: 3, day: "Tuesday", title: "Snacks and drinks", emoji: "🥛", ready: false,
-    words: ["bread", "milk", "water", "egg"], target: "Water, please. / Thank you." },
-  { id: "w3d3", week: 3, day: "Wednesday", title: "What do you like?", emoji: "😋", ready: false,
-    words: ["like", "don't like", "yummy"], target: "I like bananas." },
-  { id: "w3d4", week: 3, day: "Thursday", title: "At the café", emoji: "☕", ready: false,
-    words: ["please", "thank you", "here you are"], target: "Here you are. / Thank you." },
-  { id: "w3d5", week: 3, day: "Friday", title: "My little shop", emoji: "🛒", ready: false,
-    words: ["review"], target: "I like apples. Water, please. Thank you!" },
+  // ---------------- WEEK 3 — Food, likes and polite speaking ----------------
+  // game: { type: "tap" (default) | "cafe" | "memory" | "missing", items?: [...] } — items default to the lesson cards.
+  {
+    id: "w3d1", week: 3, day: "Monday", title: "Fruits", emoji: "🍎", ready: true,
+    warmup: {
+      say: "Hello, {name}! Are you hungry? Yummy, fruit!", key: "yes",
+      prompt: "Say: Yes!",
+      parent: "Révision : un animal et une couleur de la semaine 2. Si possible, préparez de vrais fruits : les vrais objets donnent envie de parler."
+    },
+    cards: [
+      { word: "apple", emoji: "🍎", say: "Apple. An apple!" },
+      { word: "banana", emoji: "🍌", say: "Banana. A banana!" },
+      { word: "orange", emoji: "🍊", say: "Orange. An orange!" },
+      { word: "grapes", emoji: "🍇", say: "Grapes!" }
+    ],
+    video: { title: "Fruit Is Yummy — Super Simple Songs", youtubeId: "DDjOLRNby20", page: "https://supersimple.com/song/fruit-is-yummy/" },
+    chant: ["Apple, apple, yummy!", "Banana, banana, yummy!", "Orange and grapes!", "Fruit is yummy!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Apple or banana?" },
+        { who: "{name}", line: "Banana, please!" },
+        { who: "Parent", line: "Here you are." },
+        { who: "{name}", line: "Thank you!" }
+      ],
+      activity: "Panier à faire semblant : elle choisit un fruit. « Apple or banana? » puis attendez quelques secondes. La vidéo cite aussi mango, pineapple, kiwi : bonus."
+    },
+    skill: "Nomme pomme, banane, orange, raisin"
+  },
+  {
+    id: "w3d2", week: 3, day: "Tuesday", title: "Snacks and drinks", emoji: "🥛", ready: true,
+    warmup: {
+      say: "Hello, {name}! Are you hungry? I'm hungry!", key: "hungry",
+      prompt: "Say: I'm hungry!",
+      parent: "Révision des fruits d'hier. Préparez des tasses et assiettes (dînette) pour le café."
+    },
+    cards: [
+      { word: "bread", emoji: "🍞", say: "Bread.", order: "Bread, please!" },
+      { word: "milk", emoji: "🥛", say: "Milk.", order: "Milk, please!" },
+      { word: "water", emoji: "💧", say: "Water.", order: "Water, please!" },
+      { word: "egg", emoji: "🥚", say: "Egg. An egg!", order: "An egg, please!" }
+    ],
+    game: { type: "cafe" },
+    video: { title: "Are You Hungry? — Super Simple Songs", youtubeId: "jpyb_uyNaEI", page: "https://supersimple.com/song/are-you-hungry/" },
+    chant: ["Are you hungry?", "Yes, I am!", "Water, please!", "Thank you!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Are you hungry?" },
+        { who: "{name}", line: "Yes!" },
+        { who: "Parent", line: "What do you want?" },
+        { who: "{name}", line: "Water, please." },
+        { who: "Parent", line: "Here you are." },
+        { who: "{name}", line: "Thank you!" }
+      ],
+      activity: "Café à faire semblant avec la dînette : elle commande (« Water, please »), vous servez (« Here you are »), elle dit « Thank you! ». Puis on échange les rôles. Le jeu « Fox's café » : le renard commande, elle sert en touchant la bonne image."
+    },
+    skill: "Dit « Water, please » / « Thank you »"
+  },
+  {
+    id: "w3d3", week: 3, day: "Wednesday", title: "What do you like?", emoji: "😋", ready: true,
+    warmup: {
+      say: "Hello, {name}! I like bananas! Yummy!", key: "yummy",
+      prompt: "Say: Yummy!",
+      parent: "Révision : « Water, please », « Thank you ». Puis frottez-vous le ventre en disant « Yummy! »."
+    },
+    cards: [
+      { word: "yummy", emoji: "😋", say: "Yummy!" },
+      { word: "I like it", emoji: "👍", say: "I like it!", key: "like it" },
+      { word: "I don't like it", emoji: "👎", say: "I don't like it.", key: "dont like" },
+      { word: "I like bananas", emoji: "🍌", say: "I like bananas!", key: "like bananas" }
+    ],
+    game: { type: "missing" },
+    video: { title: "Do You Like Broccoli Ice Cream? — Super Simple Songs", youtubeId: "frN3nvhIHUk", page: "https://supersimple.com/song/do-you-like-broccoli-ice-cream/" },
+    chant: ["Do you like bananas?", "Yes, I do! Yummy!", "Do you like broccoli ice cream?", "No, I don't!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Do you like bananas?" },
+        { who: "{name}", line: "Yes, I do!" },
+        { who: "Parent", line: "Do you like broccoli ice cream?" },
+        { who: "{name}", line: "No, I don't!" },
+        { who: "{name}", line: "I like apples!" }
+      ],
+      activity: "Triez des images d'aliments en deux tas : « I like it » et « Not today ». La chanson est volontairement drôle (glace au brocoli) : riez ensemble, ça aide à retenir."
+    },
+    skill: "Dit « I like… » (avec aide)"
+  },
+  {
+    id: "w3d4", week: 3, day: "Thursday", title: "At the café", emoji: "☕", ready: true,
+    warmup: {
+      say: "Welcome to Fox's café, {name}! Hello!", key: "hello",
+      prompt: "Say: Hello!",
+      parent: "Révision : « I like… ». Installez un petit café (table, tasses, fruits en jouet)."
+    },
+    cards: [
+      { word: "please", emoji: "🙏", say: "Please." },
+      { word: "thank you", emoji: "💛", say: "Thank you!", key: "thank you" },
+      { word: "here you are", emoji: "🤲", say: "Here you are.", key: "here you are" },
+      { word: "an apple, please", emoji: "🍎", say: "An apple, please.", key: "apple please" }
+    ],
+    game: { type: "cafe", items: [
+      { word: "apple", emoji: "🍎", say: "Apple.", order: "An apple, please!" },
+      { word: "banana", emoji: "🍌", say: "Banana.", order: "A banana, please!" },
+      { word: "milk", emoji: "🥛", say: "Milk.", order: "Milk, please!" },
+      { word: "bread", emoji: "🍞", say: "Bread.", order: "Bread, please!" },
+      { word: "water", emoji: "💧", say: "Water.", order: "Water, please!" }
+    ] },
+    video: { title: "Fruit Is Yummy — Super Simple Songs", youtubeId: "DDjOLRNby20", page: "https://supersimple.com/song/fruit-is-yummy/" },
+    chant: ["An apple, please!", "Here you are!", "Thank you!", "You're welcome!"],
+    speak: {
+      script: [
+        { who: "{name}", line: "Hello!" },
+        { who: "Parent", line: "Hello! What do you want?" },
+        { who: "{name}", line: "An apple, please." },
+        { who: "Parent", line: "Here you are." },
+        { who: "{name}", line: "Thank you!" }
+      ],
+      activity: "Chacun son tour client et serveur. Le serveur dit « Here you are », le client « Thank you! ». Pas besoin de phrases parfaites : « Apple, please » c'est très bien."
+    },
+    skill: "Utilise « please » et « thank you »"
+  },
+  {
+    id: "w3d5", week: 3, day: "Friday", title: "My little shop", emoji: "🛒", ready: true,
+    warmup: {
+      say: "Hello, {name}! Welcome to your little shop!", key: "hello",
+      prompt: "Say: Hello!",
+      parent: "Jour du magasin ! Elle choisit 3 aliments (jouets ou vrais) à vendre."
+    },
+    cards: [
+      { word: "I like apples", emoji: "🍎", say: "I like apples!", key: "like apples" },
+      { word: "water, please", emoji: "💧", say: "Water, please.", key: "water please" },
+      { word: "here you are", emoji: "🤲", say: "Here you are.", key: "here you are" },
+      { word: "thank you", emoji: "💛", say: "Thank you!", key: "thank you" }
+    ],
+    game: { type: "cafe", items: [
+      { word: "apple", emoji: "🍎", say: "Apple.", order: "An apple, please!" },
+      { word: "orange", emoji: "🍊", say: "Orange.", order: "An orange, please!" },
+      { word: "grapes", emoji: "🍇", say: "Grapes.", order: "Grapes, please!" },
+      { word: "egg", emoji: "🥚", say: "Egg.", order: "An egg, please!" },
+      { word: "milk", emoji: "🥛", say: "Milk.", order: "Milk, please!" }
+    ] },
+    video: { title: "Do You Like Broccoli Ice Cream? — Super Simple Songs", youtubeId: "frN3nvhIHUk", page: "https://supersimple.com/song/do-you-like-broccoli-ice-cream/" },
+    chant: ["I like apples!", "Water, please!", "Here you are!", "Thank you!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Are you hungry?" },
+        { who: "{name}", line: "Yes!" },
+        { who: "Parent", line: "What do you want?" },
+        { who: "{name}", line: "An apple, please." },
+        { who: "Parent", line: "Here you are." },
+        { who: "{name}", line: "Thank you!" },
+        { who: "Parent", line: "Do you like bananas?" },
+        { who: "{name}", line: "Yes, I do!" }
+      ],
+      activity: "Proposez 3 choix, elle commande. Bilan de la semaine 3 (« Contrôle du vendredi »). Activité papier « My mini menu » : dessinez Apple, Banana, Water, Milk ; elle entoure ce qu'elle veut et dit « I'd like…, please »."
+    },
+    skill: "Fait semblant de commander en anglais"
+  },
 
-  // ---------------- WEEK 4 ----------------
-  { id: "w4d1", week: 4, day: "Monday", title: "My family", emoji: "👨‍👩‍👧", ready: false,
-    words: ["mum", "dad", "sister", "brother", "family"], target: "This is my mum." },
-  { id: "w4d2", week: 4, day: "Tuesday", title: "My body", emoji: "👀", ready: false,
-    words: ["head", "eyes", "nose", "mouth", "hands", "feet"], target: "These are my eyes." },
-  { id: "w4d3", week: 4, day: "Wednesday", title: "My favorite things", emoji: "🧸", ready: false,
-    words: ["ball", "doll", "book", "teddy"], target: "I like my teddy. / It's brown." },
-  { id: "w4d4", week: 4, day: "Thursday", title: "My day", emoji: "🌙", ready: false,
-    words: ["wake up", "eat", "play", "sleep"], target: "I eat. / I play. / Good night!" },
-  { id: "w4d5", week: 4, day: "Friday", title: "English show day", emoji: "⭐", ready: false,
-    words: ["review"], target: "Hello! My name is … I am six. I like cats. Goodbye!" }
+  // ---------------- WEEK 4 — Family, body and everyday conversations ----------------
+  {
+    id: "w4d1", week: 4, day: "Monday", title: "My family", emoji: "👨‍👩‍👧", ready: true,
+    warmup: {
+      say: "Hello, {name}! This is my family. Hello, family!", key: "hello",
+      prompt: "Say: Hello, family!",
+      parent: "Révision du café (« please », « thank you »). Préparez une photo de famille."
+    },
+    cards: [
+      { word: "mum", emoji: "👩", say: "Mum. This is my mum.", key: "mum" },
+      { word: "dad", emoji: "👨", say: "Dad. This is my dad.", key: "dad" },
+      { word: "sister", emoji: "👧", say: "Sister. This is my sister.", key: "sister" },
+      { word: "brother", emoji: "👦", say: "Brother. This is my brother.", key: "brother" }
+    ],
+    game: { type: "memory" },
+    video: { title: "The People In My Family — Super Simple Songs", youtubeId: "yDua9ms9_eg", page: "https://supersimple.com/song/the-people-in-my-family/" },
+    chant: ["This is my mum!", "This is my dad!", "This is my sister!", "This is my brother!", "I love my family!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Who is this?" },
+        { who: "{name}", line: "This is my mum." },
+        { who: "Parent", line: "And who is this?" },
+        { who: "{name}", line: "This is my dad." },
+        { who: "Both", line: "I love my family!" }
+      ],
+      activity: "Montrez une photo de famille, elle désigne chacun : « This is my mum. » La chanson dit « mother / father » : c'est le même sens que « mum / dad », précisez-le en une phrase. Jeu de mémoire : retrouver les paires."
+    },
+    skill: "Nomme les membres de la famille"
+  },
+  {
+    id: "w4d2", week: 4, day: "Tuesday", title: "My body", emoji: "👀", ready: true,
+    warmup: {
+      say: "Hello, {name}! Touch your head! Can you say head?", key: "head",
+      prompt: "Touch your head and say: Head!",
+      parent: "Révision de la famille. Debout, prêts à bouger pour « Head, shoulders, knees and toes »."
+    },
+    cards: [
+      { word: "head", emoji: "🙆", say: "Head." },
+      { word: "eyes", emoji: "👀", say: "Eyes." },
+      { word: "nose", emoji: "👃", say: "Nose." },
+      { word: "mouth", emoji: "👄", say: "Mouth." },
+      { word: "hands", emoji: "👐", say: "Hands." },
+      { word: "feet", emoji: "🦶", say: "Feet." }
+    ],
+    video: { title: "Head Shoulders Knees & Toes — Super Simple Songs", youtubeId: "VAOOT5ZfQyU", page: "https://supersimple.com/song/head-shoulders-knees-toes/" },
+    moves: [
+      { emoji: "🙆", say: "Simon says: touch your head!" },
+      { emoji: "👃", say: "Simon says: touch your nose!" },
+      { emoji: "👀", say: "Simon says: close your eyes!" },
+      { emoji: "👏", say: "Simon says: clap your hands!" },
+      { emoji: "🦶", say: "Simon says: stamp your feet!" },
+      { emoji: "👄", say: "Simon says: touch your mouth!" }
+    ],
+    chant: ["Head and nose!", "Eyes and mouth!", "Clap your hands!", "Stamp your feet!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What is this?" },
+        { who: "{name}", line: "My nose!" },
+        { who: "Parent", line: "How many eyes?" },
+        { who: "{name}", line: "Two eyes!" },
+        { who: "{name}", line: "These are my eyes." }
+      ],
+      activity: "Touchez chaque partie du corps en la nommant. Dessinez une personne ensemble et nommez chaque partie. La chanson ajoute shoulders, knees, toes, ears : bonus."
+    },
+    skill: "Montre et nomme les parties du corps"
+  },
+  {
+    id: "w4d3", week: 4, day: "Wednesday", title: "My favorite things", emoji: "🧸", ready: true,
+    warmup: {
+      say: "Hello, {name}! I like my teddy! What do you like?", key: "like",
+      prompt: "Show your favorite toy!",
+      parent: "Révision du corps (« touch your nose »). Elle va chercher 2 ou 3 jouets préférés."
+    },
+    cards: [
+      { word: "ball", emoji: "⚽", say: "Ball. A ball!" },
+      { word: "doll", emoji: "🪆", say: "Doll. A doll!" },
+      { word: "book", emoji: "📖", say: "Book. A book!" },
+      { word: "teddy", emoji: "🧸", say: "Teddy. I like my teddy!", key: "teddy" }
+    ],
+    game: { type: "missing" },
+    video: { title: "I Have A Toy — Super Simple Songs", youtubeId: "KkB3jcqyQ5g", page: "https://supersimple.com/song/i-have-a-toy/" },
+    chant: ["I have a ball!", "I have a book!", "I like my teddy!", "It's brown!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "What's your favorite toy?" },
+        { who: "{name}", line: "I like my teddy." },
+        { who: "Parent", line: "What color is it?" },
+        { who: "{name}", line: "It's brown." }
+      ],
+      activity: "Elle présente un jouet préféré : « I like my teddy. It's brown. » Jeu « What's missing? » : 3 jouets sur la table, elle ferme les yeux, vous en cachez un. La vidéo montre aussi car, robot, dinosaur : bonus."
+    },
+    skill: "Décrit un jouet : « I like my teddy. It's brown. »"
+  },
+  {
+    id: "w4d4", week: 4, day: "Thursday", title: "My day", emoji: "🌙", ready: true,
+    warmup: {
+      say: "Good morning, {name}! Wake up! Can you say good morning?", key: "good morning",
+      prompt: "Say: Good morning!",
+      parent: "Révision des jouets. Prenez une poupée pour jouer sa journée."
+    },
+    cards: [
+      { word: "wake up", emoji: "⏰", say: "Wake up!", key: "wake up" },
+      { word: "eat", emoji: "🍽️", say: "Eat. I eat.", key: "eat" },
+      { word: "play", emoji: "🧩", say: "Play. I play.", key: "play" },
+      { word: "sleep", emoji: "😴", say: "Sleep. Good night!", key: "sleep" }
+    ],
+    game: { type: "memory" },
+    video: { title: "This Is The Way We Go To Bed — Super Simple Songs", youtubeId: "v1YjJmMvnOw", page: "https://supersimple.com/song/this-is-the-way-we-go-to-bed/" },
+    moves: [
+      { emoji: "⏰", say: "Wake up! Stretch!" },
+      { emoji: "🍽️", say: "Eat! Yum yum!" },
+      { emoji: "🧩", say: "Play! Let's play!" },
+      { emoji: "😴", say: "Sleep! Good night!" }
+    ],
+    chant: ["Wake up!", "I eat!", "I play!", "Good night!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Good morning!" },
+        { who: "{name}", line: "Good morning!" },
+        { who: "Parent", line: "What do you do?" },
+        { who: "{name}", line: "I play." },
+        { who: "Both", line: "Good night!" }
+      ],
+      activity: "Jouez la journée d'une poupée : elle se réveille, mange, joue, dort. À utiliser au quotidien : « Wash your hands », « Let's go », « Good night »."
+    },
+    skill: "Dit « I eat », « I play », « Good night »"
+  },
+  {
+    id: "w4d5", week: 4, day: "Friday", title: "English show day", emoji: "⭐", ready: true,
+    warmup: {
+      say: "It's show day, {name}! Hello, everybody!", key: "hello",
+      prompt: "Say: Hello, everybody!",
+      parent: "Grand final ! Invitez la famille ou des peluches comme public. Elle choisit ses jouets préférés à présenter."
+    },
+    cards: [
+      { word: "hello", emoji: "👋", say: "Hello!" },
+      { word: "My name is …", emoji: "🙋‍♀️", say: "My name is {name}.", key: "my name is" },
+      { word: "I am six", emoji: "6️⃣", say: "I am six.", key: "six" },
+      { word: "I like cats", emoji: "🐱", say: "I like cats.", key: "like cats" },
+      { word: "goodbye", emoji: "🤗", say: "Goodbye!" }
+    ],
+    video: { title: "Bye Bye Goodbye — Super Simple Songs", youtubeId: "PraN5ZoSjiY", page: "https://supersimple.com/song/bye-bye-goodbye/" },
+    chant: ["Hello! My name is {name}.", "I am six.", "I like cats.", "Goodbye!"],
+    speak: {
+      script: [
+        { who: "Parent", line: "Hello! What's your name?" },
+        { who: "{name}", line: "My name is {name}." },
+        { who: "Parent", line: "How old are you?" },
+        { who: "{name}", line: "I am six." },
+        { who: "Parent", line: "What color do you like?" },
+        { who: "{name}", line: "I like pink." },
+        { who: "Parent", line: "What animal do you like?" },
+        { who: "{name}", line: "I like cats." },
+        { who: "Parent", line: "Very good! Goodbye!" },
+        { who: "{name}", line: "Goodbye!" }
+      ],
+      activity: "Spectacle : elle se présente devant le public et présente ses jouets. Bilan final : « Contrôle du vendredi » (16 compétences). Activité papier « My English mini-book » : page 1 My name is…, page 2 I like cats, page 3 I like apples, page 4 I like yellow. Adaptez « six », « pink », « cats » à ses vraies réponses. Son diplôme est dans « Mes autocollants » une fois les 20 leçons faites."
+    },
+    skill: "Se présente (avec aide)"
+  }
 ];
 
 window.WEEK_THEMES = {
