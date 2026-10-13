@@ -16,7 +16,7 @@
     "Listen, and tap the right picture!",
     "Well done! You are a star!"
   ];
-  const RATINGS = { not_yet: "Pas encore", with_help: "Avec aide", independent: "Seule" };
+  const RATINGS = () => ({ not_yet: t("r_not_yet"), with_help: t("r_with_help"), independent: t("r_independent") });
   const PRAISE = ["Yes!", "Super!", "Well done!", "Great!", "Fantastic!"];
 
   // ---------- storage: several children (profiles) + family settings, all on this device ----------
@@ -25,7 +25,7 @@
   function fresh(name) { return { name: name || "", stars: 0, lessons: {}, skills: {}, daily: { date: "", count: 0 } }; }
   function freshRoot() {
     const id = "p" + Date.now().toString(36);
-    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false } };
+    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false, lang: "en" } };
   }
   const obj = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
   function cleanData(d) {
@@ -51,7 +51,7 @@
     return { profiles, active: profiles.some((p) => p.id === r.active) ? r.active : profiles[0].id,
       settings: { listen: !!st.listen, code: /^\d{4}$/.test(st.code || "") ? st.code : "",
         limit: [0, 1, 2].includes(Number(st.limit)) ? Number(st.limit) : 0,
-        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone } };
+        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en" } };
   }
   function load() {
     try {
@@ -67,12 +67,35 @@
   let state = profile().data;
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(root)); }
-    catch (e) { toast("Progression non sauvegardée sur cet appareil."); }
+    catch (e) { toast(t("no_save")); }
   }
   function switchProfile(id) { root.active = id; state = profile().data; save(); }
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const lessonsToday = () => (state.daily && state.daily.date === today()) ? state.daily.count : 0;
   const canPlay = () => !root.settings.limit || lessonsToday() < root.settings.limit;
+
+  // ---------- parent-facing language (EN | FR). The child's lessons are always in English. ----------
+  const lang = () => (root.settings.lang === "fr" ? "fr" : "en");
+  function t(k, v) {
+    const D = window.I18N || { en: {} };
+    let s = (D[lang()] && D[lang()][k]) || D.en[k] || k;
+    if (v) Object.keys(v).forEach((x) => { s = s.split("{" + x + "}").join(v[x]); });
+    return s;
+  }
+  const locale = () => (lang() === "fr" ? "fr-FR" : "en-GB");
+  // Parent texts written per lesson: French in lessons.js, English in window.PARENT_EN
+  function pt(l, field) {
+    if (lang() === "en" && window.PARENT_EN && window.PARENT_EN[l.id] && window.PARENT_EN[l.id][field]) return window.PARENT_EN[l.id][field];
+    return field === "parent" ? l.warmup.parent : field === "activity" ? l.speak.activity : l.skill;
+  }
+  const skillsOf = (w) => ((lang() === "en" && window.SKILLS_EN) ? window.SKILLS_EN : window.SKILLS)[w];
+  const langSwitch = () => `<div class="lang-switch" role="group" aria-label="${t("lang_label")}">
+    <button data-lang="en" aria-pressed="${lang() === "en"}">EN</button><span aria-hidden="true">|</span><button data-lang="fr" aria-pressed="${lang() === "fr"}">FR</button></div>`;
+  function bindLang(rerender) {
+    app.querySelectorAll("[data-lang]").forEach((b) => b.onclick = () => {
+      root.settings.lang = b.dataset.lang; document.documentElement.lang = lang(); save(); rerender();
+    });
+  }
 
   const childName = () => state.name || "friend";
   const fill = (s) => String(s).replace(/\{name\}/g, childName());
@@ -249,11 +272,11 @@
     const code = root.settings.code;
     if (code) {
       let typed = "";
-      wrap.innerHTML = `<div class="gate-box"><h2>Espace parent</h2><p>Entrez votre code</p>
+      wrap.innerHTML = `<div class="gate-box"><h2>${t("parent_area")}</h2><p>${t("enter_code")}</p>
         <div class="pin">${[0, 1, 2, 3].map((i) => `<span data-pin="${i}"></span>`).join("")}</div>
         <div class="keypad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map((k) => k === "" ? "<span></span>"
-          : `<button data-k="${k}" aria-label="${k === "del" ? "Effacer" : k}">${k === "del" ? "⌫" : k}</button>`).join("")}</div>
-        <button data-cancel class="gate-cancel">Annuler</button></div>`;
+          : `<button data-k="${k}" aria-label="${k === "del" ? t("erase") : k}">${k === "del" ? "⌫" : k}</button>`).join("")}</div>
+        <button data-cancel class="gate-cancel">${t("cancel")}</button></div>`;
       const pin = wrap.querySelector(".pin");
       const paint = () => wrap.querySelectorAll("[data-pin]").forEach((x, i) => x.classList.toggle("on", i < typed.length));
       wrap.addEventListener("click", (e) => {
@@ -270,10 +293,10 @@
     } else {
       const a = 3 + Math.floor(Math.random() * 6), b = 4 + Math.floor(Math.random() * 5), ans = a + b;
       const opts = shuffle([ans, ans + 2, ans - 3]);
-      wrap.innerHTML = `<div class="gate-box"><h2>Espace parent</h2><p>Combien font ${a} + ${b} ?</p>
+      wrap.innerHTML = `<div class="gate-box"><h2>${t("parent_area")}</h2><p>${t("sum_q", { a, b })}</p>
         <div class="row-btns center">${opts.map((o) => `<button data-v="${o}" class="gate-num">${o}</button>`).join("")}</div>
-        <p class="small">Astuce : créez un code à 4 chiffres dans l'espace parent.</p>
-        <button data-cancel class="gate-cancel">Annuler</button></div>`;
+        <p class="small">${t("gate_tip")}</p>
+        <button data-cancel class="gate-cancel">${t("cancel")}</button></div>`;
       wrap.addEventListener("click", (e) => {
         const btn = e.target.closest("button"); if (!btn) return;
         wrap.remove();
@@ -292,7 +315,7 @@
     if (app.querySelector(".landing")) renderLanding();
   });
   window.addEventListener("appinstalled", () => {
-    installEvt = null; toast("Hello Fox is installed ✓");
+    installEvt = null; toast(t("installed_toast"));
     if (app.querySelector("[data-start]")) renderHome();
     if (app.querySelector(".landing")) renderLanding(true);
   });
@@ -313,41 +336,38 @@
   const DOTS_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>';
   function renderLanding(justInstalled) {
     hush();
+    document.documentElement.lang = lang();
     const ios = isIOS();
-    const steps = ios
-      ? [[SHARE_SVG, "Tap <b>Share</b> at the top (or bottom) of Safari."], [PLUS_SVG, "Choose <b>Add to Home Screen</b>."], [foxSVG("happy", 34), "Tap <b>Add</b>, then open <b>Hello Fox</b> from the home screen."]]
-      : [[DOTS_SVG, "In Chrome, tap the <b>⋮</b> menu at the top right."], [PLUS_SVG, "Choose <b>Install app</b> (or <b>Add to Home screen</b>)."], [foxSVG("happy", 34), "Open <b>Hello Fox</b> from the home screen."]];
-    document.documentElement.lang = "en";
+    const steps = ios ? [[SHARE_SVG, t("l_ios1")], [PLUS_SVG, t("l_ios2")], [foxSVG("happy", 34), t("l_ios3")]]
+      : [[DOTS_SVG, t("l_and1")], [PLUS_SVG, t("l_and2")], [foxSVG("happy", 34), t("l_and3")]];
     app.innerHTML = `<div class="landing">
+      <div class="top-lang">${langSwitch()}</div>
       <section class="l-hero">
         ${foxSVG("happy", 170)}
         <h1>Hello Fox!</h1>
-        <p class="l-tag">Learn English by playing with a friendly fox. For beginners aged 6 to 8.</p>
+        <p class="l-tag">${t("l_tag")}</p>
       </section>
       <section class="l-cards">
-        <div class="l-card"><h2>The fox leads the way</h2><p>Fox says each word, waits for your child to repeat it, then moves on. Almost nothing to read.</p></div>
-        <div class="l-card"><h2>20 lessons, 4 weeks</h2><p>Greetings, colours, animals, food and family. Songs, games, stickers and a certificate.</p></div>
-        <div class="l-card"><h2>Parents stay in charge</h2><p>Parent code, screen-time limit, your own voice, progress tracking and backups.</p></div>
+        <div class="l-card"><h2>${t("l_c1_t")}</h2><p>${t("l_c1")}</p></div>
+        <div class="l-card"><h2>${t("l_c2_t")}</h2><p>${t("l_c2")}</p></div>
+        <div class="l-card"><h2>${t("l_c3_t")}</h2><p>${t("l_c3")}</p></div>
       </section>
       <section class="l-install" id="install">
-        <h2>${justInstalled ? "Installed!" : "1. Install Hello Fox on the tablet"}</h2>
-        ${justInstalled ? `<p>Close this page and open <b>Hello Fox</b> from the home screen. Setup starts there.</p>`
-          : installEvt ? `<button class="big-start" data-install><span class="play-dot">${PLUS_SVG}</span><span class="s-text"><span class="s-main">Install Hello Fox</span><span class="s-sub">Free · no account · no ads</span></span></button>`
-          : `<ol class="l-steps">${steps.map(([ic, t], i) => `<li><span class="l-num">${i + 1}</span><span class="l-ic">${ic}</span><span>${t}</span></li>`).join("")}</ol>
-             ${ios ? `<p class="small">On iPad and iPhone, use Safari. Important: do the setup <b>in the installed app</b>, not here (Safari and the app don't share their data).</p>`
-                   : `<p class="small">Use Chrome. If the link opened inside WhatsApp, Facebook or Gmail, use the menu → “Open in Chrome”.</p>`}`}
-        <h2 class="l-h2b">2. Open the app and set it up</h2>
-        <p>On first launch: your parent code, your child's name and screen time. Two minutes, then hand over the tablet.</p>
+        <h2>${justInstalled ? t("l_installed") : t("l_install_h")}</h2>
+        ${justInstalled ? `<p>${t("l_installed_p")}</p>`
+          : installEvt ? `<button class="big-start" data-install><span class="play-dot">${PLUS_SVG}</span><span class="s-text"><span class="s-main">${t("l_install_btn")}</span><span class="s-sub">${t("l_install_sub")}</span></span></button>`
+          : `<ol class="l-steps">${steps.map(([ic, x], i) => `<li><span class="l-num">${i + 1}</span><span class="l-ic">${ic}</span><span>${x}</span></li>`).join("")}</ol>
+             <p class="small">${ios ? t("l_ios_note") : t("l_and_note")}</p>`}
+        <h2 class="l-h2b">${t("l_setup_h")}</h2>
+        <p>${t("l_setup_p")}</p>
       </section>
       <section class="l-privacy">
-        <h2>Privacy</h2>
-        <ul><li>No account, no ads, no tracking.</li>
-          <li>Names and progress stay on this tablet.</li>
-          <li>Videos (Super Simple Songs) only start after a parent agrees, in a YouTube player that can't open other pages.</li>
-          <li>A family, non-commercial site, not affiliated with Super Simple or the British Council.</li></ul>
+        <h2>${t("privacy")}</h2>
+        <ul><li>${t("l_p1")}</li><li>${t("l_p2")}</li><li>${t("l_p3")}</li><li>${t("l_p4")}</li></ul>
       </section>
-      <button class="l-browser" data-browser>Continue in the browser (parents)</button>
+      <button class="l-browser" data-browser>${t("l_browser")}</button>
     </div>`;
+    bindLang(() => renderLanding(justInstalled));
     const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
     app.querySelector("[data-browser]").onclick = () => { try { sessionStorage.setItem("hf-browser", "1"); } catch (e) { } setupStep = 0; renderSetup(); };
   }
@@ -356,52 +376,55 @@
   let setupStep = 0, setupMsg = "";
   function renderSetup() {
     hush();
+    document.documentElement.lang = lang();
     const st = root.settings;
     const named = root.profiles.filter((p) => p.data.name);
     const dots = [0, 1, 2, 3, 4].map((i) => `<span class="${i < setupStep ? "done" : i === setupStep ? "on" : ""}"></span>`).join("");
-    const colorPick = (sel) => COLORS.map((c, i) => `<label class="swatch" style="background:${c}"><input type="radio" name="kcolor" value="${c}" ${c === sel ? "checked" : ""}><span class="sr">Couleur ${i + 1}</span></label>`).join("");
+    const colorPick = (sel) => COLORS.map((c, i) => `<label class="swatch" style="background:${c}"><input type="radio" name="kcolor" value="${c}" ${c === sel ? "checked" : ""}><span class="sr">${t("colour_n", { n: i + 1 })}</span></label>`).join("");
     const nextColor = COLORS[named.length % COLORS.length];
+    const names = named.map((p) => esc(p.data.name)).join(" " + t("and") + " ") || t("your_child");
     const pages = [
       () => `<div class="s-fox">${foxSVG("happy", 150)}</div>
-        <h1>Bienvenue !</h1>
-        <p>Configurons Hello Fox en deux minutes. Cette partie est pour vous, le parent : l'enfant ne la verra pas.</p>
-        <ul class="s-list"><li>Tout reste sur cette tablette : pas de compte, pas de publicité.</li><li>Vous pourrez tout changer plus tard dans l'espace parent.</li></ul>
-        <div class="s-actions"><button class="s-primary" data-go="1">Commencer</button>
-        <label class="s-ghost" for="rest">J'ai une sauvegarde</label><input id="rest" type="file" accept="application/json,.json" class="sr"></div>`,
-      () => `<h1>Votre code parent</h1>
-        <p>4 chiffres pour ouvrir l'espace parent et confirmer les vidéos. Choisissez un code que l'enfant ne connaît pas.</p>
+        <h1>${t("s_welcome")}</h1>
+        <p>${t("s_welcome_p")}</p>
+        <ul class="s-list"><li>${t("s_w1")}</li><li>${t("s_w2")}</li></ul>
+        <div class="s-actions"><button class="s-primary" data-go="1">${t("s_start")}</button>
+        <label class="s-ghost" for="rest">${t("s_have_backup")}</label><input id="rest" type="file" accept="application/json,.json" class="sr"></div>`,
+      () => `<h1>${t("s_code_h")}</h1>
+        <p>${t("s_code_p")}</p>
         <div class="s-form">
-          <label for="c1">Code (4 chiffres)</label><input id="c1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
-          <label for="c2">Retapez le code</label><input id="c2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
+          <label for="c1">${t("s_code1")}</label><input id="c1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
+          <label for="c2">${t("s_code2")}</label><input id="c2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
         </div>
-        ${st.code ? `<p class="small">Un code existe déjà. Laissez vide pour le garder.</p>` : ""}
-        <div class="s-actions"><button class="s-ghost" data-go="0">Retour</button><button class="s-primary" data-code>Continuer</button></div>`,
-      () => `<h1>Qui va apprendre ?</h1>
-        <p>Le prénom s'affiche et le renard le dit. Ajoutez chaque enfant de la maison.</p>
+        ${st.code ? `<p class="small">${t("s_code_keep")}</p>` : ""}
+        <div class="s-actions"><button class="s-ghost" data-go="0">${t("back")}</button><button class="s-primary" data-code>${t("continue")}</button></div>`,
+      () => `<h1>${t("s_kids_h")}</h1>
+        <p>${t("s_kids_p")}</p>
         ${named.length ? `<div class="s-kids">${named.map((p) => `<span class="s-kid"><span class="avatar" style="background:${p.color}">${esc(p.data.name.slice(0, 1).toUpperCase())}</span>${esc(p.data.name)}</span>`).join("")}</div>` : ""}
         <div class="s-form">
-          <label for="kname">${named.length ? "Ajouter un autre enfant (facultatif)" : "Prénom de l'enfant"}</label>
-          <input id="kname" maxlength="20" autocomplete="off" placeholder="Prénom">
-          <fieldset class="swatches"><legend>Couleur</legend>${colorPick(nextColor)}</fieldset>
-          <button class="s-ghost" data-addk>Ajouter</button>
+          <label for="kname">${named.length ? t("s_kid_add_more") : t("s_kid_name")}</label>
+          <input id="kname" maxlength="20" autocomplete="off" placeholder="${t("first_name")}">
+          <fieldset class="swatches"><legend>${t("colour")}</legend>${colorPick(nextColor)}</fieldset>
+          <button class="s-ghost" data-addk>${t("add")}</button>
         </div>
-        <div class="s-actions"><button class="s-ghost" data-go="1">Retour</button><button class="s-primary" data-kids ${named.length ? "" : "disabled"}>Continuer</button></div>`,
-      () => `<h1>Réglages</h1>
-        <fieldset class="segs"><legend>Temps d'écran : leçons par jour</legend>
-          ${[[1, "1"], [2, "2"], [0, "Sans limite"]].map(([v, t]) => `<label class="seg ${st.limit === v ? "on" : ""}"><input type="radio" name="slimit" value="${v}" ${st.limit === v ? "checked" : ""}>${t}</label>`).join("")}</fieldset>
-        <p class="small">Une leçon dure environ 30 minutes avec vous. Quand la limite est atteinte, le renard dit « See you tomorrow! ».</p>
-        ${SR ? `<label class="skill"><input type="checkbox" id="slisten" ${st.listen ? "checked" : ""}> Fox listens : le renard écoute si l'enfant répète</label>
-        <p class="small">Désactivé par défaut : la voix est alors transformée en texte par les serveurs de Google (Android) ou d'Apple (iPad).</p>` : ""}
-        <div class="s-actions"><button class="s-ghost" data-go="2">Retour</button><button class="s-primary" data-sets>Continuer</button></div>`,
+        <div class="s-actions"><button class="s-ghost" data-go="1">${t("back")}</button><button class="s-primary" data-kids ${named.length ? "" : "disabled"}>${t("continue")}</button></div>`,
+      () => `<h1>${t("s_settings_h")}</h1>
+        <fieldset class="segs"><legend>${t("s_limit_legend")}</legend>
+          ${[[1, "1"], [2, "2"], [0, t("no_limit")]].map(([v, x]) => `<label class="seg ${st.limit === v ? "on" : ""}"><input type="radio" name="slimit" value="${v}" ${st.limit === v ? "checked" : ""}>${x}</label>`).join("")}</fieldset>
+        <p class="small">${t("s_limit_p")}</p>
+        ${SR ? `<label class="skill"><input type="checkbox" id="slisten" ${st.listen ? "checked" : ""}> ${t("s_listen")}</label>
+        <p class="small">${t("s_listen_p")}</p>` : ""}
+        <div class="s-actions"><button class="s-ghost" data-go="2">${t("back")}</button><button class="s-primary" data-sets>${t("continue")}</button></div>`,
       () => `<div class="s-fox">${foxSVG("talk", 170)}</div>
-        <h1>C'est prêt !</h1>
-        <p>Donnez la tablette à ${esc(named.map((p) => p.data.name).join(" et ") || "votre enfant")}. Le renard s'occupe du reste.</p>
-        <p class="small">Astuce : pour que l'enfant reste dans l'appli, activez l'Accès guidé (iPad, Réglages → Accessibilité) ou l'épinglage d'application (Android, Réglages → Sécurité).</p>
-        <div class="s-actions"><button class="s-ghost" data-go="3">Retour</button><button class="s-primary big" data-done>C'est parti !</button></div>`
+        <h1>${t("s_ready_h")}</h1>
+        <p>${t("s_ready_p", { names })}</p>
+        <p class="small">${t("s_ready_tip")}</p>
+        <div class="s-actions"><button class="s-ghost" data-go="3">${t("back")}</button><button class="s-primary big" data-done>${t("s_go")}</button></div>`
     ];
-    app.innerHTML = `<div class="setup"><div class="s-dots" aria-label="Étape ${setupStep + 1} sur 5">${dots}</div>
+    app.innerHTML = `<div class="setup"><div class="setup-top"><div class="s-dots" aria-label="${t("s_step", { n: setupStep + 1 })}">${dots}</div>${langSwitch()}</div>
       <section class="s-card">${pages[setupStep]()}${setupMsg ? `<p class="s-msg" role="alert">${esc(setupMsg)}</p>` : ""}</section></div>`;
     setupMsg = "";
+    bindLang(renderSetup);
     const go = (n) => { setupStep = n; renderSetup(); };
     app.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(Number(b.dataset.go)));
     const fail = (m) => { setupMsg = m; renderSetup(); };
@@ -411,26 +434,26 @@
       const f = e.target.files && e.target.files[0]; if (!f) return;
       let data = null;
       try { data = f.size < 2000000 ? cleanRoot(JSON.parse(await f.text())) : null; } catch (err) { data = null; }
-      if (!data) return fail("Ce fichier n'est pas une sauvegarde Hello Fox.");
-      data.settings.setupDone = false; data.settings.code = st.code;
+      if (!data) return fail(t("e_not_backup"));
+      data.settings.setupDone = false; data.settings.code = st.code; data.settings.lang = st.lang;
       root = data; state = profile().data; save();
-      toast("Sauvegarde restaurée ✓ " + data.profiles.map((p) => p.data.name).filter(Boolean).join(", "));
+      toast(t("restored") + " " + data.profiles.map((p) => p.data.name).filter(Boolean).join(", "));
       go(1);
     };
     const cb = app.querySelector("[data-code]");
     if (cb) cb.onclick = () => {
       const a = app.querySelector("#c1").value.trim(), b = app.querySelector("#c2").value.trim();
       if (!a && !b && st.code) return go(2);
-      if (!/^\d{4}$/.test(a)) return fail("Le code doit avoir exactement 4 chiffres.");
-      if (a !== b) return fail("Les deux codes ne sont pas identiques.");
+      if (!/^\d{4}$/.test(a)) return fail(t("e_code4"));
+      if (a !== b) return fail(t("e_code_match"));
       st.code = a; save(); go(2);
     };
     const ak = app.querySelector("[data-addk]");
     if (ak) {
       const add = () => {
         const name = app.querySelector("#kname").value.trim().slice(0, 20);
-        if (!name) return fail("Écrivez un prénom.");
-        if (root.profiles.length >= 8 && !root.profiles.some((p) => !p.data.name)) return fail("8 enfants maximum.");
+        if (!name) return fail(t("e_name"));
+        if (root.profiles.length >= 8 && !root.profiles.some((p) => !p.data.name)) return fail(t("e_max8"));
         const color = (app.querySelector('input[name="kcolor"]:checked') || {}).value || nextColor;
         const empty = root.profiles.find((p) => !p.data.name);
         if (empty) { empty.data.name = name; empty.color = color; }
@@ -444,7 +467,7 @@
     const kb = app.querySelector("[data-kids]");
     if (kb) kb.onclick = () => {
       const typed = app.querySelector("#kname").value.trim();
-      if (typed) return fail("Touchez « Ajouter » pour ajouter " + typed + ", ou effacez le prénom.");
+      if (typed) return fail(t("e_add_first", { name: typed }));
       go(3);
     };
     app.querySelectorAll('input[name="slimit"]').forEach((r) => r.onchange = () => { st.limit = Number(r.value); save(); renderSetup(); });
@@ -496,7 +519,7 @@
         <div class="top-right">
           <div class="pill" aria-label="${state.stars} stars">${ICON.star}${state.stars}</div>
           <button class="pill" data-stickers aria-label="My stickers">${ICON.book}${stickerCount()}/${STICKERS.length}</button>
-          <button class="lock-btn" data-parent aria-label="Espace parent">${ICON.lock}</button>
+          <button class="lock-btn" data-parent aria-label="${t("parent_area")}">${ICON.lock}</button>
         </div>
       </header>
       <section class="map" aria-label="Map">
@@ -513,7 +536,7 @@
           <span class="s-text"><span class="s-main">${allDone() ? "Play again" : "Start today's lesson"}</span>
           <span class="s-sub">${next ? "Week " + next.week + " · " + esc(next.title) : ""}</span></span></button>
       </div>
-      ${installEvt && !standalone() ? `<button class="install-btn" data-install>Installer Hello Fox sur cet appareil</button>` : ""}`;
+      ${installEvt && !standalone() ? `<button class="install-btn" data-install>${t("install_here")}</button>` : ""}`;
 
     const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
     const ce = app.querySelector("[data-cert]"); if (ce) ce.onclick = renderCertificate;
@@ -542,7 +565,7 @@
     hush();
     app.innerHTML = `<section class="sleepy">${foxSVG("sleepy", 240)}
       <h1>See you tomorrow, ${esc(childName())}!</h1>
-      <p class="small">Limite du jour atteinte (${root.settings.limit} leçon${root.settings.limit > 1 ? "s" : ""}). Modifiable dans l'espace parent.</p>
+      <p class="small">${t("limit_reached", { n: root.settings.limit })}</p>
       <button class="big-start small-start" data-home><span class="play-dot">${ICON.home}</span><span class="s-text"><span class="s-main">Home</span></span></button></section>`;
     speak(`Well done today, ${childName()}! See you tomorrow!`);
     app.querySelector("[data-home]").onclick = renderHome;
@@ -564,7 +587,7 @@
         <p class="cert-line">finished <b>Hello Fox! English</b></p>
         <p class="cert-sub">4 weeks · 20 lessons · ${state.stars} ⭐</p>
         <div class="cert-stickers">${STICKERS.slice(0, stickerCount()).map((x) => x.e).join(" ")}</div>
-        <p class="cert-date">${end.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
+        <p class="cert-date">${end.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" })}</p>
         <p class="cert-words">Hello · My name is… · I'm happy · one, two, three · red, blue · cat, dog · jump · apple, please · thank you · this is my mum · I like…</p>
       </section>`;
     confetti(40); chime(true);
@@ -584,7 +607,7 @@
       <div class="topbar"><button class="icon-btn" data-home aria-label="Home">${ICON.home}</button>
         <div class="pill">${ICON.star}${state.stars}</div></div>
       <section class="stage"><h2>My stickers</h2>
-        <div class="minutes">${n < STICKERS.length ? `Encore ${toNext} ⭐ pour le prochain autocollant` : "Collection complète ! 🎉"}</div>
+        <div class="minutes">${n < STICKERS.length ? t("stickers_next", { n: toNext }) : t("stickers_full")}</div>
         <div class="sticker-grid">${grid}</div>
         ${allDone() ? `<div class="endbar"><button class="cert-btn" data-cert>${ICON.star} My certificate</button></div>` : ""}</section>`;
     speak(n ? "Your stickers! Tap and say the word!" : "Finish a lesson to get a sticker!");
@@ -612,7 +635,7 @@
       </div>
       <section class="stage">${inner}</section>
       <div class="nav">
-        <button class="tips-btn" data-tips aria-expanded="false">${ICON.tips}<span>Conseils parent</span></button>
+        <button class="tips-btn" data-tips aria-expanded="false">${ICON.tips}<span>${t("tips")}</span></button>
         <div class="nav-right">
           ${step > 0 ? `<button class="back-btn" data-back aria-label="Back">◀</button>` : ""}
           <button class="next-btn" data-next ${canNext ? "" : "disabled"}>${nextLabel || "Next ▶"}</button>
@@ -633,7 +656,7 @@
   }
   const enableNext = () => { const n = app.querySelector("[data-next]"); if (n && n.disabled) { n.disabled = false; n.classList.add("pulse"); } };
   const minutes = () => "";
-  const note = (t) => `<div class="parent-note" hidden><b>Pour le parent</b>${esc(fill(t))}</div>`;
+  const note = (x) => `<div class="parent-note" hidden><b>${t("for_parent")}</b>${esc(fill(x))}</div>`;
 
   function renderStep() {
     hush();
@@ -725,7 +748,7 @@
     R.onresult = (e) => { alts = Array.from(e.results[0] || []).map((a) => a.transcript); };
     R.onerror = (e) => {
       if (["not-allowed", "service-not-allowed", "network", "audio-capture"].includes(e.error)) {
-        listenBroken = true; toast("« Fox listens » indisponible ici : retour au mode 5 secondes.");
+        listenBroken = true; toast(t("listen_off_toast"));
       }
     };
     R.onend = () => {
@@ -792,7 +815,7 @@
       ${review.length ? `<div class="review"><div class="review-title">Remember?</div>
         ${review.map((c, i) => `<button class="chip" data-i="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>` : ""}
       <div class="endbar"><button class="again-btn" data-again>${ICON.again} Again</button></div>
-      ${note(L.warmup.parent + " L'écran avance tout seul : le renard parle, puis 5 secondes pour répéter.")}`, true);
+      ${note(pt(L, "parent") + t("n_hello_auto"))}`, true);
     const fox = app.querySelector("[data-fox]");
     const chips = [...app.querySelectorAll(".chip")];
     const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.key || c.word })));
@@ -814,7 +837,7 @@
       <aside class="side-fox"><div class="bubble"></div><button class="fox-btn" data-fox aria-label="Fox">${foxSVG("happy", 220)}</button>${statusHTML}</aside>
       <div class="cards cards-2">${cards}</div></div>
       <div class="endbar" hidden><button class="again-btn" data-again>${ICON.again} Again</button></div>
-      ${note("Laissez-la répéter pendant la barre rose (5 s), avec le geste. Touchez une image pour la réentendre. Montrez le sens avant de traduire ; un mot en français si elle bloque, puis on revient à l'anglais.")}`,
+      ${note(t("n_learn"))}`,
       false);
     const els = [...app.querySelectorAll(".word-card")];
     const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word }));
@@ -833,11 +856,11 @@
       <div class="video-box" id="vbox"><div class="video-gate">
         ${foxSVG("surprised", 120)}
         <button class="listen-btn" data-load>${ICON.play}<span>Play video</span></button>
-        <p>${videoOK() ? "" : "Un parent confirme une fois par jour (la vidéo vient de YouTube)."}</p>
+        <p>${videoOK() ? "" : t("v_once")}</p>
       </div></div>
-      <div class="small">${esc(v.title)} · vidéo officielle diffusée via le lecteur YouTube.</div>
+      <div class="small">${esc(v.title)} · ${t("v_official")}</div>
       <div class="row-btns center"><button class="link-btn" data-alt>Sing with Fox</button></div>
-      ${note("Regardez ensemble, faites pause et répétez les mots. « Sing with Fox » : une petite comptine sans internet, à répéter ligne par ligne.")}`, true);
+      ${note(t("n_watch"))}`, true);
     speak(STEP_SAY[2]);
     const load = () => {
       root.settings.videoDay = today(); save(); hush();
@@ -876,7 +899,7 @@
       <button class="listen-btn" data-q>${ICON.ear}<span>${cafe ? "What does Fox want?" : "What do you hear?"}</span></button>
       <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.round ? "⭐" : "☆").join(" ")}</div>
       <div class="cards">${cards}</div>
-      ${cafe ? note("Le renard est le client : il commande, elle sert en touchant le bon aliment. Ensuite, à la maison, inversez : elle commande, vous servez.") : ""}`, false);
+      ${cafe ? note(t("n_cafe")) : ""}`, false);
     const it = items[order[play.round]];
     let firstTry = true;
     const ask = () => speak(cafe ? (it.order || it.say) : (it.ask && play.round % 2 === 1 ? it.ask : it.say));
@@ -905,7 +928,7 @@
     frame(`<h2>Find the pairs!</h2>${minutes()}
       <div class="mem-grid">${tiles.map((t, i) => `<button class="mem" data-t="${i}" aria-label="card"><span class="back">${foxSVG("calm", 76)}</span>
         <span class="front"><span class="e">${t.c.emoji}</span>${esc(t.c.word)}</span></button>`).join("")}</div>
-      ${note("Jeu de mémoire : elle retourne deux cartes. Chaque carte dit son mot : faites-la répéter. Une paire trouvée = le renard dit la phrase entière.")}`, false);
+      ${note(t("n_memory"))}`, false);
     sayThen("Find the pairs!", () => { });
     let open = [], found = 0, busy = false;
     app.querySelectorAll(".mem").forEach((b) => b.onclick = () => {
@@ -943,7 +966,7 @@
       <div class="cover" hidden>${foxSVG("sleepy", 180)}Close your eyes!</div>
       <div class="pick" hidden><div class="prompt">What's missing?</div><div class="pick-row">${shuffle(shown.map((c, i) => ({ c, i }))).map(({ c, i }) =>
         `<button class="chip" data-p="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div></div>
-      ${note("Regardez les images ensemble, nommez-les. Elle ferme les yeux pendant que l'écran se cache, puis trouve l'image disparue. À refaire avec de vrais objets sur la table.")}`, false);
+      ${note(t("n_missing"))}`, false);
     const look = app.querySelector(".look"), cover = app.querySelector(".cover"), pick = app.querySelector(".pick");
     sayThen(play.miss === 0 ? "Look! Remember the pictures!" : "Look again!", () => later(2500, () => {
       cover.hidden = false;
@@ -976,7 +999,7 @@
       ${statusHTML}${moves ? `<div class="moves">${moves}</div>` : ""}<div class="script">${script}</div>
       <div class="endbar" hidden><button class="again-btn" data-again>${ICON.again} Again</button></div>
       ${canRecord ? `<button class="rec-btn" data-rec>${ICON.mic}<span>Say it, then hear yourself!</span></button>` : ""}
-      ${note(L.speak.activity + (canRecord ? " Le micro enregistre 4 secondes puis rejoue sa voix. Rien n'est sauvegardé ni envoyé." : ""))}`, true);
+      ${note(pt(L, "activity") + (canRecord ? t("n_mic") : ""))}`, true);
     const lines = [...app.querySelectorAll(".script-line")];
     const mv = [...app.querySelectorAll(".move-card")];
     const items = (L.moves || []).map((m, i) => ({ el: mv[i], say: m.say, act: true }))
@@ -994,7 +1017,7 @@
     hush();
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { toast("Micro non autorisé. Autorisez-le dans les réglages du navigateur."); return; }
+    catch (e) { toast(t("mic_denied")); return; }
     const chunks = [];
     const rec = new MediaRecorder(stream);
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
@@ -1019,9 +1042,9 @@
       <div class="score" aria-label="3 stars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
       <div class="review">${L.cards.map((c) => `<button class="chip" data-r="${esc(c.say)}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>
       <button class="listen-btn" data-bye>${ICON.ear}<span>Goodbye!</span></button>
-      <div class="parent-note" hidden><b>Pour le parent — ${esc(L.skill)}</b>
-        Demandez-lui 2 ou 3 mots du jour. Optionnel : notez la compétence (jamais montré à l'enfant).
-        <div class="rating">${Object.entries(RATINGS).map(([k, v]) => `<button class="${sel(k)}" data-rt="${k}">${v}</button>`).join("")}</div>
+      <div class="parent-note" hidden><b>${t("for_parent")} — ${esc(pt(L, "skill"))}</b>
+        ${t("n_stars")}
+        <div class="rating">${Object.entries(RATINGS()).map(([k, v]) => `<button class="${sel(k)}" data-rt="${k}">${v}</button>`).join("")}</div>
       </div>`, true, "Get my stars ⭐");
     confetti(30); chime(true);
     speak(`Well done, ${childName()}! Three stars!`);
@@ -1047,7 +1070,7 @@
     state.daily = { date: today(), count: lessonsToday() + 1 };
     save();
     if (stickerCount() > before) renderNewSticker(STICKERS[stickerCount() - 1]);
-    else { renderHome(); toast(firstTime ? "+3 ⭐" : "+1 ⭐ — bravo pour la révision !"); }
+    else { renderHome(); toast(firstTime ? "+3 ⭐" : t("revision")); }
   }
 
   function renderNewSticker(s) {
@@ -1074,21 +1097,21 @@
   }
   function renderParent() {
     hush();
+    document.documentElement.lang = lang();
     const st = root.settings;
     const ready = LESSONS.filter((l) => l.ready);
     const doneN = ready.filter((l) => isDone(l.id)).length;
     const ticked = Object.values(state.skills).filter(Boolean).length;
-    const allTexts = ready.reduce((acc, l) => acc.concat(voiceTexts(l).map((x) => x.t)), []);
-    const uniq = [...new Set(allTexts)];
-    const recN = uniq.filter((t) => voices.has(t)).length;
+    const uniq = [...new Set(ready.reduce((acc, l) => acc.concat(voiceTexts(l).map((x) => x.t)), []))];
+    const recN = uniq.filter((x) => voices.has(x)).length;
     const pct = (a, b) => Math.round((100 * a) / Math.max(1, b)) + "%";
     const rows = ready.map((l) => {
       const p = state.lessons[l.id];
-      return `<tr><td>S${l.week} · ${esc(l.day.slice(0, 3))}</td><td>${esc(l.title)}</td>
-        <td>${p ? "Faite le " + new Date(p.completedAt).toLocaleDateString("fr-FR") + (p.times > 1 ? ` (×${p.times})` : "") : "—"}</td>
-        <td>${p && p.rating ? RATINGS[p.rating] : "—"}</td></tr>`;
+      return `<tr><td>W${l.week} · ${esc(l.day.slice(0, 3))}</td><td>${esc(l.title)}</td>
+        <td>${p ? t("done_on", { d: new Date(p.completedAt).toLocaleDateString(locale()) }) + (p.times > 1 ? ` (×${p.times})` : "") : "—"}</td>
+        <td>${p && p.rating ? RATINGS()[p.rating] : "—"}</td></tr>`;
     }).join("");
-    const skills = [1, 2, 3, 4].map((w) => `<div class="skill-week"><b>Semaine ${w}</b>${window.SKILLS[w].map((x, i) => {
+    const skills = [1, 2, 3, 4].map((w) => `<div class="skill-week"><b>${lang() === "fr" ? "Semaine" : "Week"} ${w}</b>${skillsOf(w).map((x, i) => {
       const k = w + "-" + i;
       return `<label class="skill"><input type="checkbox" data-sk="${k}" ${state.skills[k] ? "checked" : ""}> ${esc(x)}</label>`;
     }).join("")}</div>`).join("");
@@ -1096,171 +1119,160 @@
     const links = LESSONS.filter((l) => l.video && !seen.has(l.video.page) && seen.add(l.video.page)).map((l) =>
       `<li><a href="${esc(l.video.page)}" target="_blank" rel="noopener noreferrer">${esc(l.video.title)}</a></li>`).join("");
     const limitOpt = (v, label) => `<label class="seg ${st.limit === v ? "on" : ""}"><input type="radio" name="limit" value="${v}" ${st.limit === v ? "checked" : ""}>${label}</label>`;
+    const kidLessons = (p) => LESSONS.filter((l) => l.ready && p.data.lessons[l.id] && p.data.lessons[l.id].status === "done").length;
 
     app.innerHTML = `
       <header class="p-head">
-        <button class="icon-btn" data-home aria-label="Accueil">${ICON.home}</button>
-        <h1>Espace parent</h1>
-        <span class="badge ${st.code ? "ok" : ""}">${ICON.lock}${st.code ? "Protégé par votre code" : "Pas encore de code"}</span>
+        <button class="icon-btn" data-home aria-label="Home">${ICON.home}</button>
+        <h1>${t("parent_area")}</h1>
+        ${langSwitch()}
+        <span class="badge ${st.code ? "ok" : ""}">${ICON.lock}${st.code ? t("p_protected") : t("p_no_code")}</span>
       </header>
 
       <div class="p-grid">
-        <section class="card"><h2>Qui joue ?</h2>
+        <section class="card"><h2>${t("p_who")}</h2>
           ${root.profiles.map((p) => `<button class="kid ${p.id === root.active ? "on" : ""}" data-kid="${esc(p.id)}">
             <span class="avatar" style="background:${p.color}">${esc((p.data.name || "?").slice(0, 1).toUpperCase())}</span>
-            <span><b>${esc(p.data.name || "Sans prénom")}</b><small>${p.data.stars} étoiles · ${LESSONS.filter((l) => l.ready && p.data.lessons[l.id] && p.data.lessons[l.id].status === "done").length}/20 leçons</small></span></button>`).join("")}
-          ${root.profiles.length < 8 ? `<div class="add-kid"><label for="newkid" class="sr">Prénom du nouvel enfant</label>
-            <input id="newkid" maxlength="20" placeholder="Prénom d'un autre enfant"><button data-addkid>Ajouter</button></div>` : ""}
+            <span><b>${esc(p.data.name || t("p_no_name"))}</b><small>${t("p_stars_lessons", { s: p.data.stars, l: kidLessons(p) })}</small></span></button>`).join("")}
+          ${root.profiles.length < 8 ? `<div class="add-kid"><label for="newkid" class="sr">${t("p_new_kid")}</label>
+            <input id="newkid" maxlength="20" placeholder="${t("p_new_kid")}"><button data-addkid>${t("add")}</button></div>` : ""}
         </section>
 
-        <section class="card"><h2>Progression ${state.name ? "— " + esc(state.name) : ""}</h2>
-          <div class="bar-row"><span>Leçons</span><span>${doneN} / ${ready.length}</span></div>
+        <section class="card"><h2>${t("p_progress")} ${state.name ? "— " + esc(state.name) : ""}</h2>
+          <div class="bar-row"><span>${t("p_lessons")}</span><span>${doneN} / ${ready.length}</span></div>
           <div class="bar"><i style="width:${pct(doneN, ready.length)};background:#F4862C"></i></div>
-          <div class="bar-row"><span>Contrôle du vendredi</span><span data-tick>${ticked} / 16</span></div>
+          <div class="bar-row"><span>${t("p_friday")}</span><span data-tick>${ticked} / 16</span></div>
           <div class="bar"><i data-tickbar style="width:${pct(ticked, 16)};background:#3FAE6B"></i></div>
-          <a href="#skills" class="more">Voir les compétences</a>
+          <a href="#skills" class="more">${t("p_see_skills")}</a>
         </section>
 
-        <section class="card"><h2>Temps d'écran</h2>
-          <fieldset class="segs"><legend>Leçons par jour</legend>${limitOpt(1, "1")}${limitOpt(2, "2")}${limitOpt(0, "Sans limite")}</fieldset>
-          <p class="small">Ensuite, le renard dit « See you tomorrow! » et l'appli se repose jusqu'au lendemain. Aujourd'hui : ${lessonsToday()} leçon(s).</p>
+        <section class="card"><h2>${t("p_screen")}</h2>
+          <fieldset class="segs"><legend>${t("p_per_day")}</legend>${limitOpt(1, "1")}${limitOpt(2, "2")}${limitOpt(0, t("no_limit"))}</fieldset>
+          <p class="small">${t("p_screen_p", { n: lessonsToday() })}</p>
         </section>
 
-        <section class="card"><h2>Code parent</h2>
-          <p class="small">${st.code ? "Code actif. Pour le changer, tapez-en un nouveau." : "4 chiffres que vous choisissez, à la place de l'addition."}</p>
-          <div class="add-kid"><label for="pcode" class="sr">Nouveau code à 4 chiffres</label>
+        <section class="card"><h2>${t("p_code")}</h2>
+          <p class="small">${st.code ? t("p_code_on") : t("p_code_off")}</p>
+          <div class="add-kid"><label for="pcode" class="sr">${t("p_new_code")}</label>
             <input id="pcode" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
-            <button data-setcode>${st.code ? "Changer" : "Créer"}</button></div>
-          ${st.code ? `<button class="link" data-delcode>Supprimer le code</button>` : ""}
+            <button data-setcode>${st.code ? t("change") : t("create")}</button></div>
+          ${st.code ? `<button class="link" data-delcode>${t("p_del_code")}</button>` : ""}
         </section>
 
-        <section class="card"><h2>Sauvegarde</h2>
+        <section class="card"><h2>${t("p_backup")}</h2>
           <div class="two">
-            <button class="dark" data-export>Exporter</button>
-            <label class="ghost" for="impfile">Importer</label>
+            <button class="dark" data-export>${t("export")}</button>
+            <label class="ghost" for="impfile">${t("import")}</label>
             <input id="impfile" type="file" accept="application/json,.json" class="sr">
           </div>
-          <p class="small">${st.lastBackup ? "Dernière sauvegarde : " + esc(st.lastBackup) + "." : "Aucune sauvegarde pour l'instant."} Le fichier contient les progrès de tous les enfants (pas les enregistrements de voix ni le code).</p>
+          <p class="small">${st.lastBackup ? t("p_last_backup", { d: esc(st.lastBackup) }) : t("p_no_backup")} ${t("p_backup_p")}</p>
         </section>
 
-        <section class="card"><h2>Voix et écoute</h2>
-          <div class="bar-row"><span>Mots enregistrés avec ma voix</span><span>${recN} / ${uniq.length}</span></div>
+        <section class="card"><h2>${t("p_voice_listen")}</h2>
+          <div class="bar-row"><span>${t("p_recorded")}</span><span>${recN} / ${uniq.length}</span></div>
           <div class="bar"><i style="width:${pct(recN, uniq.length)};background:#7C6CF2"></i></div>
-          <a href="#voice" class="more">Enregistrer des mots</a>
-          ${SR ? `<label class="skill"><input type="checkbox" data-listen ${st.listen ? "checked" : ""}> Fox listens (reconnaissance vocale)</label>` : ""}
+          <a href="#voice" class="more">${t("p_record_words")}</a>
+          ${SR ? `<label class="skill"><input type="checkbox" data-listen ${st.listen ? "checked" : ""}> ${t("p_listen_label")}</label>` : ""}
         </section>
       </div>
 
-      <section class="panel"><h2>Prénom de l'enfant</h2>
-        <p class="small">Enregistré uniquement sur cette tablette. Jamais envoyé ailleurs, jamais publié sur GitHub.</p>
-        <div class="add-kid"><label for="nm" class="sr">Prénom</label><input id="nm" maxlength="20" value="${esc(state.name)}" placeholder="Prénom"><button data-savename>Enregistrer</button></div></section>
+      <section class="panel"><h2>${t("p_name_h")}</h2>
+        <p class="small">${t("p_name_p")}</p>
+        <div class="add-kid"><label for="nm" class="sr">${t("first_name")}</label><input id="nm" maxlength="20" value="${esc(state.name)}" placeholder="${t("first_name")}"><button data-savename>${t("save")}</button></div></section>
 
-      <section class="panel" id="skills"><h2>Contrôle du vendredi</h2>
-        <p class="small">Cochez quand elle y arrive avec peu d'aide. Un jeu, pas un examen. Comprendre sans encore dire, c'est déjà un progrès.</p>
+      <section class="panel" id="skills"><h2>${t("p_friday")}</h2>
+        <p class="small">${t("p_friday_p")}</p>
         <div class="skills">${skills}</div></section>
 
-      <section class="panel" id="voice"><h2>Ma voix</h2>
-        <p class="small">Enregistrez chaque mot avec votre voix : le renard l'utilisera à la place de la voix robot. Les enregistrements restent sur cette tablette (jamais envoyés). 3 secondes par mot.</p>
-        <label for="vl" class="sr">Leçon</label>
-        <select id="vl" class="vl">${ready.map((l) => `<option value="${l.id}">S${l.week} ${esc(l.day.slice(0, 3))} · ${esc(l.title)}</option>`).join("")}</select>
+      <section class="panel" id="voice"><h2>${t("p_voice_h")}</h2>
+        <p class="small">${t("p_voice_p")}</p>
+        <label for="vl" class="sr">${t("lesson")}</label>
+        <select id="vl" class="vl">${ready.map((l) => `<option value="${l.id}">W${l.week} ${esc(l.day.slice(0, 3))} · ${esc(l.title)}</option>`).join("")}</select>
         <div id="vrows"></div></section>
 
-      ${SR ? `<section class="panel"><h2>Fox listens</h2>
-        <p class="small">Désactivé par défaut. Quand c'est activé, la tablette utilise la reconnaissance vocale du navigateur : sur la plupart des tablettes, la voix est envoyée aux serveurs de Google (Chrome / Android) ou d'Apple (Safari / iPad) pour être transformée en texte. Rien n'est enregistré par Hello Fox. Le renard ne dit jamais « faux » : il fait réécouter une fois puis passe au mot suivant.</p></section>` : ""}
+      ${SR ? `<section class="panel"><h2>Fox listens</h2><p class="small">${t("p_listen_p")}</p></section>` : ""}
 
-      <section class="panel"><h2>Leçons</h2>
-        <div class="table-wrap"><table><thead><tr><th>Jour</th><th>Leçon</th><th>Faite</th><th>Compétence</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <div class="row-btns"><button data-certprev>Aperçu du diplôme</button><button class="danger" data-reset>Réinitialiser cet enfant</button></div></section>
+      <section class="panel"><h2>${t("p_lessons")}</h2>
+        <div class="table-wrap"><table><thead><tr><th>${t("p_table_day")}</th><th>${t("lesson")}</th><th>${t("p_table_done")}</th><th>${t("p_table_skill")}</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="row-btns"><button data-certprev>${t("p_cert")}</button><button class="danger" data-reset>${t("p_reset")}</button></div></section>
 
-      ${standalone() ? "" : `<section class="panel"><h2>Installer comme une appli</h2>
-        ${installEvt ? `<div class="row-btns"><button data-install2>Installer maintenant</button></div>` : ""}
-        <ul class="small tips">
-          <li><b>Android (Chrome)</b> : menu <b>⋮</b> en haut à droite → <b>Installer l'application</b> (ou <b>Ajouter à l'écran d'accueil</b> → <b>Installer</b>).</li>
-          <li><b>iPad / iPhone (Safari)</b> : bouton <b>Partager</b> → <b>Sur l'écran d'accueil</b> → <b>Ajouter</b>.</li>
-          <li>Pour qu'elle reste dans l'appli : <b>Accès guidé</b> sur iPad (Réglages → Accessibilité) ou <b>Épinglage d'application</b> sur Android (Réglages → Sécurité).</li>
-        </ul></section>`}
+      ${standalone() ? "" : `<section class="panel"><h2>${t("p_install_h")}</h2>
+        ${installEvt ? `<div class="row-btns"><button data-install2>${t("p_install_now")}</button></div>` : ""}
+        <ul class="small tips"><li>${t("p_inst1")}</li><li>${t("p_inst2")}</li><li>${t("p_inst3")}</li></ul></section>`}
 
-      <section class="panel"><h2>Petites habitudes qui font la différence</h2>
-        <ul class="small tips"><li>Revoir les mots d'hier avant d'en apprendre de nouveaux.</li>
-        <li>Lui donner des raisons de parler : « Apple or banana? » et attendre quelques secondes.</li>
-        <li>Utiliser l'anglais au quotidien : « Come here », « Let's go », « Wash your hands », « Good night ».</li>
-        <li>Féliciter chaque essai. Si elle dit « apple », répondre « Yes! It is an apple. » sans corriger.</li></ul></section>
+      <section class="panel"><h2>${t("p_habits")}</h2>
+        <ul class="small tips"><li>${t("p_h1")}</li><li>${t("p_h2")}</li><li>${t("p_h3")}</li><li>${t("p_h4")}</li></ul></section>
 
-      <section class="panel"><h2>Vidéos et ressources officielles</h2><ul>${links}
-        <li><a href="https://learnenglishkids.britishcouncil.org/listen-watch/songs/hello-hello-hello" target="_blank" rel="noopener noreferrer">Hello, hello, hello — British Council (chanson, fiche à imprimer)</a></li>
+      <section class="panel"><h2>${t("p_res")}</h2><ul>${links}
+        <li><a href="https://learnenglishkids.britishcouncil.org/listen-watch/songs/hello-hello-hello" target="_blank" rel="noopener noreferrer">${t("p_bc_song")}</a></li>
         <li><a href="https://learnenglishkids.britishcouncil.org/" target="_blank" rel="noopener noreferrer">LearnEnglish Kids — British Council</a></li></ul>
-        <p class="small">Contenus © leurs auteurs, usage personnel et non commercial. Ce site n'est affilié ni à Super Simple / Skyship Entertainment ni au British Council.</p></section>
+        <p class="small">${t("p_res_note")}</p></section>
 
-      <section class="panel"><h2>Confidentialité</h2>
-        <p class="small">Pas de compte, pas de publicité, pas de statistiques. Polices hébergées ici (aucune requête à Google). Les vidéos YouTube se chargent seulement après votre confirmation, dans un lecteur qui ne peut pas ouvrir YouTube ni d'autres pages. Le micro (« hear yourself ») enregistre en mémoire, rejoue, puis efface. La progression reste dans le navigateur de cette tablette : pensez à exporter une sauvegarde.</p></section>`;
+      <section class="panel"><h2>${t("privacy")}</h2>
+        <p class="small">${t("p_privacy_p")}</p></section>`;
 
+    bindLang(renderParent);
     app.querySelector("[data-home]").onclick = renderHome;
     const i2 = app.querySelector("[data-install2]"); if (i2) i2.onclick = doInstall;
-    app.querySelectorAll("a.more").forEach((a) => a.onclick = (e) => { e.preventDefault(); const t = document.querySelector(a.getAttribute("href")); if (t) t.scrollIntoView({ behavior: "smooth" }); });
+    app.querySelectorAll("a.more").forEach((a) => a.onclick = (e) => { e.preventDefault(); const x = document.querySelector(a.getAttribute("href")); if (x) x.scrollIntoView({ behavior: "smooth" }); });
 
-    // profiles
-    app.querySelectorAll("[data-kid]").forEach((b) => b.onclick = () => { switchProfile(b.dataset.kid); homeWeek = null; renderParent(); toast("C'est au tour de " + (state.name || "cet enfant")); });
+    app.querySelectorAll("[data-kid]").forEach((b) => b.onclick = () => { switchProfile(b.dataset.kid); homeWeek = null; renderParent(); toast(t("t_turn_of", { name: state.name || t("this_child") })); });
     const ak = app.querySelector("[data-addkid]");
     if (ak) ak.onclick = () => {
       const name = app.querySelector("#newkid").value.trim().slice(0, 20);
-      if (!name) { toast("Écrivez un prénom."); return; }
-      const id = "p" + Date.now().toString(36);
-      root.profiles.push({ id, color: COLORS[root.profiles.length % COLORS.length], data: fresh(name) });
-      save(); renderParent(); toast(name + " ajouté(e) ✓");
+      if (!name) { toast(t("e_name")); return; }
+      root.profiles.push({ id: "p" + Date.now().toString(36), color: COLORS[root.profiles.length % COLORS.length], data: fresh(name) });
+      save(); renderParent(); toast(t("t_added", { name }));
     };
-    // screen time
-    app.querySelectorAll('input[name="limit"]').forEach((r) => r.onchange = () => { st.limit = Number(r.value); save(); renderParent(); toast("Temps d'écran enregistré ✓"); });
-    // parent code
+    app.querySelectorAll('input[name="limit"]').forEach((r) => r.onchange = () => { st.limit = Number(r.value); save(); renderParent(); toast(t("t_screen_saved")); });
     app.querySelector("[data-setcode]").onclick = () => {
       const v = app.querySelector("#pcode").value.trim();
-      if (!/^\d{4}$/.test(v)) { toast("Le code doit avoir 4 chiffres."); return; }
-      st.code = v; save(); renderParent(); toast("Code enregistré ✓ Notez-le quelque part.");
+      if (!/^\d{4}$/.test(v)) { toast(t("e_code4")); return; }
+      st.code = v; save(); renderParent(); toast(t("t_code_saved"));
     };
     const dc = app.querySelector("[data-delcode]");
-    if (dc) dc.onclick = () => { if (confirm("Supprimer le code parent ?")) { st.code = ""; save(); renderParent(); } };
+    if (dc) dc.onclick = () => { if (confirm(t("p_del_code_q"))) { st.code = ""; save(); renderParent(); } };
     // backup: export everything except voice recordings and the code; import replaces after a confirmation
     app.querySelector("[data-export]").onclick = () => {
       const copy = JSON.parse(JSON.stringify(root)); copy.settings.code = "";
       copy.exportedAt = new Date().toISOString(); copy.app = "hellofox";
       const blob = new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-      a.download = "hellofox-sauvegarde-" + today() + ".json"; document.body.appendChild(a); a.click(); a.remove();
+      a.download = "hellofox-backup-" + today() + ".json"; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      st.lastBackup = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }); save();
-      renderParent(); toast("Sauvegarde téléchargée ✓");
+      st.lastBackup = new Date().toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" }); save();
+      renderParent(); toast(t("t_downloaded"));
     };
     app.querySelector("#impfile").onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
-      if (f.size > 2000000) { toast("Fichier trop gros."); return; }
+      if (f.size > 2000000) { toast(t("t_too_big")); return; }
       let data = null;
       try { data = cleanRoot(JSON.parse(await f.text())); } catch (err) { data = null; }
-      if (!data) { toast("Ce fichier n'est pas une sauvegarde Hello Fox."); return; }
-      const kids = data.profiles.map((p) => p.data.name || "?").join(", ");
-      if (!confirm("Remplacer la progression actuelle par celle du fichier ?\nEnfants : " + kids)) return;
-      data.settings.code = st.code; data.settings.setupDone = true; // keep this tablet's code; already set up
+      if (!data) { toast(t("e_not_backup")); return; }
+      if (!confirm(t("t_replace_q", { kids: data.profiles.map((p) => p.data.name || "?").join(", ") }))) return;
+      data.settings.code = st.code; data.settings.setupDone = true; data.settings.lang = st.lang; // keep this tablet's code and language
       root = data; state = profile().data; save(); homeWeek = null;
-      renderParent(); toast("Sauvegarde restaurée ✓");
+      renderParent(); toast(t("restored"));
     };
-    // voice recordings
     const vl = app.querySelector("#vl");
     const vrows = () => {
       const texts = voiceTexts(LESSONS.find((x) => x.id === vl.value));
       app.querySelector("#vrows").innerHTML = texts.map((x, i) => `<div class="vrow"><span class="vtxt">${esc(x.label)}<small>${esc(x.t)}</small></span>
-        <button data-vp="${i}" aria-label="Écouter">${ICON.ear}</button>
-        <button data-vr="${i}" class="${voices.has(x.t) ? "has" : ""}" aria-label="${voices.has(x.t) ? "Réenregistrer" : "Enregistrer"}">${ICON.mic}</button>
-        ${voices.has(x.t) ? `<button data-vd="${i}" aria-label="Supprimer">✕</button>` : ""}</div>`).join("");
+        <button data-vp="${i}" aria-label="${t("listen")}">${ICON.ear}</button>
+        <button data-vr="${i}" class="${voices.has(x.t) ? "has" : ""}" aria-label="${voices.has(x.t) ? t("rerecord") : t("record")}">${ICON.mic}</button>
+        ${voices.has(x.t) ? `<button data-vd="${i}" aria-label="${t("remove")}">✕</button>` : ""}</div>`).join("");
       app.querySelectorAll("[data-vp]").forEach((b) => b.onclick = () => speak(texts[b.dataset.vp].t));
       app.querySelectorAll("[data-vd]").forEach((b) => b.onclick = async () => { await voiceDel(texts[b.dataset.vd].t); vrows(); });
       app.querySelectorAll("[data-vr]").forEach((b) => b.onclick = async () => {
         let stream;
         try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-        catch (e) { toast("Micro non autorisé."); return; }
+        catch (e) { toast(t("t_mic_denied")); return; }
         const chunks = [], rec = new MediaRecorder(stream);
         rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
         rec.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          try { await voicePut(texts[b.dataset.vr].t, new Blob(chunks, { type: rec.mimeType || "audio/mp4" })); toast("Enregistré ✓"); }
-          catch (e) { toast("Impossible d'enregistrer sur cet appareil."); }
+          stream.getTracks().forEach((x) => x.stop());
+          try { await voicePut(texts[b.dataset.vr].t, new Blob(chunks, { type: rec.mimeType || "audio/mp4" })); toast(t("t_saved")); }
+          catch (e) { toast(t("t_cant_record")); }
           vrows(); speak(texts[b.dataset.vr].t);
         };
         b.classList.add("recording"); b.disabled = true; rec.start();
@@ -1270,9 +1282,9 @@
     vl.onchange = vrows; vrows();
     const cp = app.querySelector("[data-certprev]"); if (cp) cp.onclick = renderCertificate;
     const lt = app.querySelector("[data-listen]");
-    if (lt) lt.onchange = () => { st.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? "Fox listens : activé" : "Fox listens : désactivé"); };
+    if (lt) lt.onchange = () => { st.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? t("t_listen_on") : t("t_listen_off")); };
     app.querySelector("[data-savename]").onclick = () => {
-      state.name = app.querySelector("#nm").value.trim().slice(0, 20); save(); renderParent(); toast("Enregistré ✓");
+      state.name = app.querySelector("#nm").value.trim().slice(0, 20); save(); renderParent(); toast(t("t_saved"));
     };
     app.querySelectorAll("[data-sk]").forEach((c) => c.onchange = () => {
       state.skills[c.dataset.sk] = c.checked; save();
@@ -1281,8 +1293,8 @@
       app.querySelector("[data-tickbar]").style.width = pct(n, 16);
     });
     app.querySelector("[data-reset]").onclick = () => {
-      if (confirm("Effacer la progression de " + (state.name || "cet enfant") + " sur cet appareil ?")) {
-        const n = state.name; profile().data = fresh(n); state = profile().data; save(); renderParent(); toast("Progression effacée");
+      if (confirm(t("p_reset_q", { name: state.name || t("this_child") }))) {
+        const n = state.name; profile().data = fresh(n); state = profile().data; save(); renderParent(); toast(t("t_erased"));
       }
     };
   }

@@ -32,6 +32,9 @@ In `lessons.js`, copy the structure of `w1d1` into the lesson you want (e.g. `w1
 fill in `warmup`, `cards`, `video`, `speak`, `skill`, then set `ready: true`.
 Then in `sw.js` change `VERSION` (e.g. `hellofox-v2`) so tablets pick up the update.
 
+## Languages
+Parent-facing screens (landing page, setup, parent area, parent tips) switch between **English and French** with the EN | FR button; English is the default. The child's lessons are always in English. Texts live in `i18n.js` (app) and `window.PARENT_EN` in `lessons.js` (per-lesson parent tips).
+
 ## First launch
 1. Open the site in the browser: a parent landing page explains Hello Fox and how to install it (Chrome install button on Android, picture steps for Safari on iPad).
 2. Open the installed app: a 5-step parent setup (welcome / restore a backup, parent code typed twice, children with a colour, screen time and Fox listens, hand-over screen).

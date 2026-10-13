@@ -540,3 +540,12 @@ h1, h2, .brand, .word-card, .prompt, .big-start .s-main, .next-btn, .listen-btn,
   .s-card { padding: 20px; } .s-dots span { width: 40px; }
 }
 .fox--talk .m-smile { display: none; } .fox--talk .m-talk { display: inline; }
+
+/* ---------- EN | FR switch (parent-facing screens) ---------- */
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 #EDE6DA; font-weight: 800; }
+.lang-switch button { min-height: 44px; min-width: 52px; padding: 0 12px; border-radius: 999px; background: transparent; color: var(--soft); font: 800 17px Nunito, sans-serif; }
+.lang-switch button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.lang-switch span { color: #CFC6B8; }
+.top-lang { display: flex; justify-content: flex-end; }
+.setup-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.setup-top .s-dots { margin: 0; }
