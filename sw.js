@@ -1,7 +1,9 @@
 // Offline support: caches the app shell. Bump VERSION whenever you change a file.
-const VERSION = "hellofox-v9";
+const VERSION = "hellofox-v10";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "lessons.js", "manifest.webmanifest",
+  "fonts/fonts.css", "fonts/fredoka-latin-600-normal.woff2", "fonts/fredoka-latin-700-normal.woff2",
+  "fonts/nunito-latin-600-normal.woff2", "fonts/nunito-latin-700-normal.woff2", "fonts/nunito-latin-800-normal.woff2",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"
 ];
 

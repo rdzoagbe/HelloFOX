@@ -3,9 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Security policy: only this site's own files, plus the official YouTube player (no-cookie domain) for videos. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'; worker-src 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Hello Fox!</title>
   <meta name="description" content="A friendly English learning space for young beginners.">
-  <meta name="theme-color" content="#FFB547">
+  <meta name="theme-color" content="#F4862C">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <!-- iPad / iPhone home-screen support -->
@@ -14,7 +17,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Hello Fox">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <!-- Privacy: no analytics, no external fonts, no trackers. -->
+  <!-- Privacy: no analytics, no trackers, fonts hosted here (no Google Fonts request). -->
+  <link rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>

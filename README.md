@@ -32,6 +32,13 @@ In `lessons.js`, copy the structure of `w1d1` into the lesson you want (e.g. `w1
 fill in `warmup`, `cards`, `video`, `speak`, `skill`, then set `ready: true`.
 Then in `sw.js` change `VERSION` (e.g. `hellofox-v2`) so tablets pick up the update.
 
+## What's new in the redesign
+- Drawn fox (moves its mouth while speaking), map home screen, rounded Fredoka/Nunito fonts hosted in the project (no Google Fonts request).
+- Several children: "Who's playing?" profiles, each with its own stars, stickers and progress.
+- Parent area: 4-digit parent code, screen-time limit (1 or 2 lessons a day), backup Export **and Import**, voice recordings, Fox listens.
+- Security: Content-Security-Policy (only this site + the YouTube no-cookie player), YouTube player sandboxed so it cannot open YouTube or other pages, parent check for videos once a day.
+- Tip: lock the tablet on the app with Guided Access (iPad) or App pinning (Android).
+
 ## Privacy and legal notes
 - The child's first name is typed in the **Parent area** and stays only on the tablet (browser storage). It is never in the code, so it is never public on GitHub.
 - Progress is stored only on the device. Clearing the browser data erases it. Use **Export** in the parent area for a backup.
