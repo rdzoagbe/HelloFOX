@@ -48,6 +48,14 @@ Parent-facing screens (landing page, setup, parent area, parent tips) switch bet
 - Security: Content-Security-Policy (only this site + the YouTube no-cookie player), YouTube player sandboxed so it cannot open YouTube or other pages, parent check for videos once a day.
 - Tip: lock the tablet on the app with Guided Access (iPad) or App pinning (Android).
 
+## Automatic checks
+
+Every update to `main` runs the checks in `tests/` on GitHub (tab **Actions**, workflow "Automatic checks").
+A green tick means the site still works: all 20 lessons, setup, EN | FR, videos, review of missed words and parent settings.
+A red cross means something broke; open the run to see which check failed.
+
+To run them on a computer: `npm install`, `npx playwright install chromium`, then `npm test`.
+
 ## Privacy and legal notes
 - The child's first name is typed in the **Parent area** and stays only on the tablet (browser storage). It is never in the code, so it is never public on GitHub.
 - Progress is stored only on the device. Clearing the browser data erases it. Use **Export** in the parent area for a backup.

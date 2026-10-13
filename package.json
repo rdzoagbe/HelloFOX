@@ -1,0 +1,11 @@
+{
+  "name": "hellofox",
+  "private": true,
+  "description": "Hello Fox! English for young beginners. This file is only used for the automatic checks; the app itself has no build step.",
+  "scripts": {
+    "test": "node tests/static.js && node tests/e2e.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.0"
+  }
+}

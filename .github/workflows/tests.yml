@@ -1,0 +1,45 @@
+# Runs the automatic checks after every update to the site, and on demand from the Actions tab.
+name: Automatic checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only: the checks can look at the code but can never change it.
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install the test tool
+        run: npm ci --no-audit --no-fund
+
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the checks
+        run: npm test
+
+      - name: Keep screenshots if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: test-results/
+          retention-days: 7
