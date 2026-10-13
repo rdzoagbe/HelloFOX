@@ -293,7 +293,7 @@
       `<button class="word-card" data-i="${i}"><span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`).join("");
     // Without a saved name: speaker shows "Me" and the line says "My name is …"
     const who = (w) => w === "{name}" ? "🙋‍♀️ " + (state.name || "Me") : w === "Parent" ? "👨 Parent" : "👫 Both";
-    const line = (t) => state.name ? fill(t) : t.replace(/\{name\}/g, "…");
+    const line = (t) => state.name ? fill(t) : t.replace(/\{name\}\.?/g, "…");
     const script = L.speak.script.map((s) => `<div class="script-line"><span class="who">${esc(who(s.who))}</span>
       <span class="say">${esc(line(s.line))}</span><button class="mini-listen" data-line="${esc(line(s.line).replace("…", ""))}" aria-label="Listen">🔊</button></div>`).join("");
     const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
