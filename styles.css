@@ -241,3 +241,5 @@ button:focus-visible { outline: 4px solid var(--sky); outline-offset: 3px; }
 
 .status.hear span { color: var(--leaf); animation: pulse .8s infinite; }
 .status.hear .bar { visibility: visible; background: var(--leaf); animation: shrink 6s linear forwards; }
+
+.install-btn { display: block; width: min(560px, 100%); margin: 24px auto 0; background: var(--card); border: 3px dashed var(--sky); border-radius: var(--radius); font-size: 20px; font-weight: 800; min-height: 72px; }

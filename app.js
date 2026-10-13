@@ -132,6 +132,21 @@
     document.body.appendChild(wrap);
   }
 
+  // ---------- install as an app (Android Chrome gives us its real install dialog) ----------
+  let installEvt = null;
+  const standalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); installEvt = e;
+    if (app.querySelector("[data-start]")) renderHome();
+  });
+  window.addEventListener("appinstalled", () => { installEvt = null; toast("Hello Fox est installé ✓"); if (app.querySelector("[data-start]")) renderHome(); });
+  async function doInstall() {
+    if (!installEvt) { parentGate(renderParent); return; }
+    installEvt.prompt();
+    try { await installEvt.userChoice; } catch (e) { }
+    installEvt = null; renderHome();
+  }
+
   // =================== HOME ===================
   function renderHome() {
     hush();
@@ -159,8 +174,10 @@
         <button class="big-start" data-start>▶ Start today's lesson
           <small>${next ? esc(next.emoji + " " + next.title) : ""}</small></button>
       </section>
-      ${weeks}`;
+      ${weeks}
+      ${installEvt && !standalone() ? `<button class="install-btn" data-install>📲 Installer Hello Fox sur cet appareil</button>` : ""}`;
 
+    const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
     app.querySelector("[data-start]").onclick = () => startLesson(next.id);
     app.querySelector("[data-fox]").onclick = () => speak(`Hello, ${childName()}! I'm Fox. Let's play!`);
     app.querySelector("[data-stickers]").onclick = renderStickers;
@@ -577,6 +594,13 @@
 
     app.innerHTML = `
       <div class="topbar"><button class="icon-btn" data-home aria-label="Home">🏠</button><h1 class="parent-title">Espace parent</h1><span></span></div>
+      ${standalone() ? "" : `<section class="panel"><h2>📲 Installer comme une appli</h2>
+        ${installEvt ? `<div class="row-btns"><button data-install2>📲 Installer maintenant</button></div>` : ""}
+        <ul class="small tips">
+          <li><b>Android (Chrome)</b> : menu <b>⋮</b> en haut à droite → <b>Installer l'application</b> (ou <b>Ajouter à l'écran d'accueil</b> → <b>Installer</b>).</li>
+          <li><b>iPad / iPhone (Safari)</b> : bouton <b>Partager</b> (carré avec flèche) → <b>Sur l'écran d'accueil</b> → <b>Ajouter</b>.</li>
+          <li>Utilisez Chrome sur Android (pas le navigateur Samsung ni une appli comme Facebook / WhatsApp qui ouvre le lien à l'intérieur).</li>
+        </ul></section>`}
       <section class="panel"><h2>🎧 Fox listens</h2>
         ${SR ? `<label class="skill"><input type="checkbox" data-listen ${state.listen ? "checked" : ""}> Le renard écoute si elle répète le mot</label>
         <p class="small">Désactivé par défaut. Quand c'est activé, la tablette utilise la reconnaissance vocale du navigateur : sur la plupart des tablettes, la voix est envoyée aux serveurs de Google (Chrome / Android) ou d'Apple (Safari / iPad) pour être transformée en texte. Rien n'est enregistré par Hello Fox. La reconnaissance se trompe souvent avec les voix d'enfants : le renard ne dit jamais « faux », il fait réécouter une fois puis passe au mot suivant. À utiliser avec vous à côté d'elle.</p>`
@@ -605,6 +629,7 @@
         <p class="small">Pas de compte, pas de publicité, pas de statistiques. Le micro (« hear yourself ») enregistre en mémoire, rejoue, puis efface : rien n'est sauvegardé ni envoyé. La progression reste dans le navigateur de cette tablette ; effacer les données du navigateur l'efface.</p></section>`;
 
     app.querySelector("[data-home]").onclick = renderHome;
+    const i2 = app.querySelector("[data-install2]"); if (i2) i2.onclick = doInstall;
     const lt = app.querySelector("[data-listen]");
     if (lt) lt.onchange = () => { state.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? "Fox listens : activé" : "Fox listens : désactivé"); };
     app.querySelector("[data-savename]").onclick = () => {
