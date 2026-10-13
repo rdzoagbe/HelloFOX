@@ -724,10 +724,11 @@
     if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   // One item: Fox says it, then the child gets 5 seconds to repeat (or just listens for parent lines).
-  function teach(el, say, childTurn, cb, key, act) {
-    focus(el); status("listen");
+  function teach(el, say, childTurn, cb, key, act, silent) {
+    focus(el); status(silent ? "turn" : "listen");
     const bub = app.querySelector(".bubble"); if (bub) bub.textContent = fill(say).split(/(?<=[.!?])\s/)[0];
-    sayThen(say, () => {
+    // silent: she has just heard this exact line, so Fox does not repeat it before her turn
+    (silent ? (f) => later(300, f) : (f) => sayThen(say, f))(() => {
       if (!childTurn) { status(""); later(900, cb); return; }
       if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
       status(act ? "act" : "turn");
@@ -810,7 +811,7 @@
     const next = () => {
       if (current.idx >= items.length) { focus(null); return onDone(); }
       const it = items[current.idx];
-      teach(it.el, it.say, it.turn !== false, () => { current.idx++; next(); }, it.key, it.act);
+      teach(it.el, it.say, it.turn !== false, () => { current.idx++; next(); }, it.key, it.act, it.echo);
     };
     next();
   }
@@ -1079,7 +1080,13 @@
     const lines = [...app.querySelectorAll(".script-line")];
     const mv = [...app.querySelectorAll(".move-card")];
     const items = (L.moves || []).map((m, i) => ({ el: mv[i], say: m.say, act: true }))
-      .concat(L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") })));
+      .concat(L.speak.script.map((s, i) => {
+        // When her line simply echoes the line Fox just said ("Hello!" → "Hello!"), Fox does not say it a second time:
+        // it goes straight to "Your turn!". A new line (e.g. "My name is Keren.") is still modelled once.
+        const prevLine = i > 0 ? line(L.speak.script[i - 1].line) : null;
+        const echo = s.who !== "Parent" && prevLine !== null && norm(prevLine).join(" ") === norm(line(s.line)).join(" ");
+        return { el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, ""), echo };
+      }));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
     mv.forEach((m, i) => m.onclick = () => go(i));
     app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(mv.length + i));

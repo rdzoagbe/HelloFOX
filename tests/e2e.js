@@ -133,6 +133,22 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(await p.$eval('[data-vr="0"]', (e) => e.classList.contains("has")), "a parent can record a word in their own voice");
     await p.context().close();
 
+    // ---------- 2b. Dialogue: Fox does not say her echo line twice ----------
+    console.log("Dialogue");
+    p = await newPage("dialogue", {}, seeded({}));
+    await p.evaluate(() => { window.__said = []; speechSynthesis.speak = (u) => { window.__said.push(u.text); setTimeout(() => u.onend && u.onend(), 120); }; });
+    await p.click("[data-start]"); await forceNext(p); await forceNext(p); await forceNext(p); await p.waitForTimeout(300);
+    for (let g = 0; g < 20 && !/talk/i.test(await p.textContent(".stage h2")); g++) {
+      for (const c of await p.$$(".word-card")) { await c.click().catch(() => {}); await p.waitForTimeout(100); if (await p.$(".word-card.right")) break; }
+      await p.waitForTimeout(1600);
+    }
+    await p.waitForFunction(() => window.__said.some((t) => /Again, or next/i.test(t)), null, { timeout: 40000 }).catch(() => {});
+    const all = await p.evaluate(() => window.__said);
+    const said = all.slice(all.lastIndexOf("Now, let's talk!"));
+    if (process.env.DEBUG) console.log(said, await p.textContent(".stage h2"));
+    check(said.filter((t) => t === "Hello!").length === 1 && said.filter((t) => t === "Goodbye!").length === 1, "in the dialogue Fox says each line once, then it's her turn");
+    await p.context().close();
+
     // ---------- 3. Video end screen, smart review, sound settings, languages ----------
     console.log("Video, review and parent settings");
     p = await newPage("features", {}, seeded({ code: "1234" }));
@@ -147,6 +163,8 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     await p.evaluate(() => window.dispatchEvent(new MessageEvent("message", { origin: "https://www.youtube-nocookie.com", data: JSON.stringify({ event: "infoDelivery", info: { playerState: 0 } }) })));
     await p.waitForTimeout(300);
     check(!!(await p.$(".video-end [data-again-v]")) && !!(await p.$(".video-end [data-next-v]")), "Fox's 'Watch again / Next' screen appears when a song ends");
+    const look = await p.$eval("[data-next-v]", (e) => { const c = getComputedStyle(e); return [c.backgroundColor, c.color, getComputedStyle(document.body).backgroundColor]; });
+    check(look[0] !== look[2] && look[1] === "rgb(255, 255, 255)", "the 'Watch again / Next' buttons are coloured and readable");
     await p.click("[data-next-v]"); await p.waitForTimeout(300);
     for (let g = 0; g < 12 && (await p.$("[data-q]")); g++) {
       for (const c of await p.$$(".word-card")) { await c.click().catch(() => {}); await p.waitForTimeout(120); if (await p.$(".word-card.right")) break; }
