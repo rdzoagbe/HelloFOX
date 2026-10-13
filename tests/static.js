@@ -6,7 +6,7 @@ const { execFileSync } = require("child_process");
 
 const root = path.join(__dirname, "..");
 let failed = 0;
-const check = (ok, msg) => { console.log((ok ? "  ok   " : "  FAIL ") + msg); if (!ok) failed++; };
+const check = (ok, msg) => { console.log((ok ? "  ok   " : "  FAIL ") + msg); if (!ok) { failed++; if (process.env.GITHUB_ACTIONS) console.log("::error title=Check failed::" + String(msg).replace(/\n/g, " %0A")); } };
 
 // 1. Every script parses
 for (const f of ["app.js", "lessons.js", "i18n.js", "art.js", "sw.js"]) {

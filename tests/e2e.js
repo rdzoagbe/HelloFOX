@@ -12,7 +12,7 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/cs
   ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".txt": "text/plain" };
 
 let failed = 0;
-const check = (ok, msg) => { console.log((ok ? "  ok   " : "  FAIL ") + msg); if (!ok) failed++; };
+const check = (ok, msg) => { console.log((ok ? "  ok   " : "  FAIL ") + msg); if (!ok) { failed++; if (process.env.GITHUB_ACTIONS) console.log("::error title=Check failed::" + String(msg).replace(/\n/g, " %0A")); } };
 
 // Tiny local web server for the app files
 const server = http.createServer((req, res) => {
