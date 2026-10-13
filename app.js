@@ -69,7 +69,7 @@
     };
     next();
   }
-  const hush = () => { if (hasTTS) speechSynthesis.cancel(); };
+  const hush = () => { run++; if (hasTTS) speechSynthesis.cancel(); };
 
   // ---------- small helpers ----------
   let toastTimer;
@@ -194,7 +194,7 @@
   function startLesson(id) {
     L = LESSONS.find((l) => l.id === id);
     step = 0;
-    play = { heardWarmup: false, heard: new Set(), round: 0, order: null, rating: null };
+    play = { round: 0, order: null, rating: null };
     renderStep();
   }
 
@@ -226,38 +226,95 @@
     [stepHello, stepLearn, stepWatch, stepPlay, stepStars][step]();
   }
 
-  // 1. Hello: warm-up + quick review of the previous lesson ("repeat yesterday's words")
+  // ---------- guided flow: Fox says it once -> 5 s "your turn" -> next, by itself ----------
+  const TURN_MS = 5000;
+  let run = 0; // bumped on every screen change, so old timers/sequences stop
+  function sayThen(text, cb) {
+    const my = run;
+    let done = false;
+    const fin = () => { if (done || my !== run) return; done = true; cb(); };
+    if (!hasTTS) { setTimeout(fin, 1200); return; }
+    speechSynthesis.cancel();
+    const u = utter(text);
+    u.onend = fin; u.onerror = fin;
+    speechSynthesis.speak(u);
+    setTimeout(fin, 1800 + fill(text).length * 110); // safety net if the browser never fires onend
+  }
+  const later = (ms, cb) => { const my = run; setTimeout(() => my === run && cb(), ms); };
+  function status(mode) {
+    const st = app.querySelector(".status"); if (!st) return;
+    st.className = "status " + mode;
+    st.querySelector("span").textContent = mode === "listen" ? "👂 Listen…" : mode === "turn" ? "🗣️ Your turn!" : "";
+    const bar = st.querySelector(".bar"); bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
+  }
+  const statusHTML = `<div class="status"><span></span><div class="bar"></div></div>`;
+  function focus(el) {
+    app.querySelectorAll(".active").forEach((x) => x.classList.remove("active"));
+    if (!el) return;
+    el.classList.add("active");
+    if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  // One item: Fox says it, then the child gets 5 seconds to repeat (or just listens for parent lines).
+  function teach(el, say, childTurn, cb) {
+    focus(el); status("listen");
+    sayThen(say, () => {
+      if (!childTurn) { status(""); later(900, cb); return; }
+      status("turn");
+      later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); cb(); });
+    });
+  }
+  // A list of items, starting at `from`. Tapping an item restarts from it.
+  function guide(items, from, onDone) {
+    run++;
+    let i = from;
+    const next = () => { if (i >= items.length) { focus(null); return onDone(); } const it = items[i++]; teach(it.el, it.say, it.turn !== false, next); };
+    next();
+  }
+  function showEnd(msg) {
+    const end = app.querySelector(".endbar"); if (end) end.hidden = false;
+    enableNext(); sayThen(msg, () => {});
+  }
+
+  // 1. Hello: one greeting, her turn, quick review of yesterday's words, then on to new words automatically
   function stepHello() {
     const prev = previousLesson(L);
     const review = prev ? shuffle(prev.cards).slice(0, 3) : [];
     frame(`
-      <div class="mascot" aria-hidden="true">🦊</div>
-      <h2>${esc(L.emoji)} ${esc(L.title)}</h2>${minutes()}
-      <button class="listen-btn" data-say>🔊 Listen</button>
+      <div class="mascot" data-fox aria-hidden="true">🦊</div>
+      <h2>${esc(L.emoji)} ${esc(L.title)}</h2>
       <div class="prompt">${esc(fill(L.warmup.prompt))}</div>
-      <button class="did-btn" data-did>🙋‍♀️ I did it!</button>
+      ${statusHTML}
       ${review.length ? `<div class="review"><div class="review-title">🧠 Remember?</div>
-        ${review.map((c) => `<button class="chip" data-r="${esc(c.say)}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>` : ""}
-      ${note(L.warmup.parent)}`, play.heardWarmup);
-    speak(L.warmup.say);
-    app.querySelector("[data-say]").onclick = () => speak(L.warmup.say);
-    app.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => speak(b.dataset.r));
-    app.querySelector("[data-did]").onclick = () => { play.heardWarmup = true; chime(true); confetti(12); speak("Great job!"); enableNext(); };
+        ${review.map((c, i) => `<button class="chip" data-i="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>` : ""}
+      <div class="endbar"><button class="again-btn" data-again>🔁 Again</button></div>
+      ${note(L.warmup.parent + " L'écran avance tout seul : le renard parle, puis 5 secondes pour répéter.")}`, true);
+    const fox = app.querySelector("[data-fox]");
+    const chips = [...app.querySelectorAll(".chip")];
+    const items = [{ el: fox, say: L.warmup.say }].concat(review.map((c, i) => ({ el: chips[i], say: c.say })));
+    const go = (from) => guide(items, from, () => {
+      confetti(12);
+      sayThen("Great! Now, new words!", () => later(400, () => { step = 1; renderStep(); }));
+    });
+    chips.forEach((c, i) => c.onclick = () => go(i + 1));
+    fox.onclick = () => go(0);
+    app.querySelector("[data-again]").onclick = () => go(0);
+    later(300, () => go(0));
   }
 
-  // 2. Learn: tap every card to hear it
+  // 2. Learn: each word is said once, 5 s to repeat, then the next one. At the end: again or next?
   function stepLearn() {
-    const cards = L.cards.map((c, i) => `<button class="word-card ${play.heard.has(i) ? "heard" : ""}" data-i="${i}">
+    const cards = L.cards.map((c, i) => `<button class="word-card" data-i="${i}">
       <span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`).join("");
-    frame(`<h2>New words</h2>${minutes()}<div class="cards">${cards}</div>
-      ${note("Touchez chaque image, écoutez, puis répétez ensemble avec le geste. Montrez le sens avant de traduire ; un mot en français si elle bloque, puis on revient à l'anglais.")}`,
-      play.heard.size === L.cards.length);
-    speak(STEP_SAY[1]);
-    app.querySelectorAll(".word-card").forEach((b) => b.onclick = () => {
-      const i = Number(b.dataset.i); speak(L.cards[i].say);
-      play.heard.add(i); b.classList.add("heard"); b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle");
-      if (play.heard.size === L.cards.length) { chime(true); enableNext(); }
-    });
+    frame(`<h2>New words</h2>${statusHTML}<div class="cards">${cards}</div>
+      <div class="endbar" hidden><button class="again-btn" data-again>🔁 Again</button></div>
+      ${note("Laissez-la répéter pendant la barre rose (5 s), avec le geste. Touchez une image pour la réentendre. Montrez le sens avant de traduire ; un mot en français si elle bloque, puis on revient à l'anglais.")}`,
+      false);
+    const els = [...app.querySelectorAll(".word-card")];
+    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say }));
+    const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
+    els.forEach((b, i) => b.onclick = () => go(i));
+    app.querySelector("[data-again]").onclick = () => { els.forEach((e) => e.classList.remove("heard")); go(0); };
+    sayThen("Listen, and repeat!", () => go(0));
   }
 
   // 3. Watch: YouTube's official embeddable player, loaded after a parent confirms (once per session)
@@ -303,14 +360,19 @@
         <button class="listen-btn" data-q>🔊 What do you hear?</button>
         <div class="progress-stars">${Array.from({ length: ROUNDS }, (_, i) => i < play.round ? "⭐" : "☆").join(" ")}</div>
         <div class="cards">${cards}</div>`}
-      ${gameDone ? `<div class="script">${script}</div>
+      ${gameDone ? `${statusHTML}<div class="script">${script}</div>
+        <div class="endbar" hidden><button class="again-btn" data-again>🔁 Again</button></div>
         ${canRecord ? `<button class="rec-btn" data-rec>🎤 Say it, then hear yourself!</button>` : ""}
         ${note(L.speak.activity + (canRecord ? " Le micro enregistre 4 secondes puis rejoue sa voix. Rien n'est sauvegardé ni envoyé." : ""))}` : ""}`, gameDone);
 
     if (gameDone) {
-      speak("Now, let's talk!");
-      app.querySelectorAll("[data-line]").forEach((b) => b.onclick = () => speak(b.dataset.line));
-      const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => recordMe(rec);
+      const lines = [...app.querySelectorAll(".script-line")];
+      const items = L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent" }));
+      const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
+      app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(i));
+      app.querySelector("[data-again]").onclick = () => go(0);
+      const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => { run++; focus(null); status(""); recordMe(rec); };
+      sayThen("Now, let's talk!", () => go(0));
       return;
     }
     const target = order[play.round];

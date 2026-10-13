@@ -9,9 +9,9 @@ window.LESSONS = [
   {
     id: "w1d1", week: 1, day: "Monday", title: "Hello!", emoji: "👋", ready: true,
     warmup: {
-      say: "Hello! Hello! Hello, {name}!",
+      say: "Hello, {name}! Can you say hello?",
       prompt: "Wave and say: Hello!",
-      parent: "Faites un grand signe de la main et dites « Hello! ». Attendez 3 à 5 secondes. Un geste suffit."
+      parent: "Faites un grand signe de la main avec elle. Un geste suffit si elle ne parle pas encore."
     },
     cards: [
       { word: "hello", emoji: "👋", say: "Hello!" },
