@@ -21,7 +21,7 @@
   const PRAISE = ["Yes!", "Super!", "Well done!", "Great!", "Fantastic!"];
 
   // ---------- storage (guarded: private mode / cleared data must not break the app) ----------
-  function fresh() { return { name: "", stars: 0, lessons: {}, skills: {}, seenStickers: 0 }; }
+  function fresh() { return { name: "", stars: 0, lessons: {}, skills: {}, seenStickers: 0, listen: false }; }
   function load() {
     try { return Object.assign(fresh(), JSON.parse(localStorage.getItem(STORE_KEY)) || {}); } catch (e) { return fresh(); }
   }
@@ -45,11 +45,11 @@
     voice = vs.find((v) => /en-GB/i.test(v.lang)) || vs.find((v) => /^en/i.test(v.lang)) || null;
   }
   if (hasTTS) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-  function utter(text, pitch) {
+  function utter(text, pitch, rate) {
     const u = new SpeechSynthesisUtterance(fill(text));
     u.lang = voice ? voice.lang : "en-GB";
     if (voice) u.voice = voice;
-    u.rate = 0.8; u.pitch = pitch || 1.1;
+    u.rate = rate || 0.8; u.pitch = pitch || 1.1;
     return u;
   }
   function speak(text) {
@@ -69,7 +69,7 @@
     };
     next();
   }
-  const hush = () => { run++; if (hasTTS) speechSynthesis.cancel(); };
+  const hush = () => { run++; current = null; if (typeof stopListening === "function") stopListening(); if (hasTTS) speechSynthesis.cancel(); if (typeof setPaused === "function") setPaused(false); };
 
   // ---------- small helpers ----------
   let toastTimer;
@@ -204,7 +204,8 @@
       <div class="topbar">
         <button class="icon-btn" data-home aria-label="Home">🏠</button>
         <div class="steps" aria-label="Step ${step + 1} of 5">${dots}</div>
-        <button class="icon-btn fox-help" data-help aria-label="Fox, say it again">🦊</button>
+        <div class="top-right"><button class="icon-btn" data-pause aria-label="Pause">⏸️</button>
+        <button class="icon-btn fox-help" data-help aria-label="Fox, say it again">🦊</button></div>
       </div>
       <section class="stage">${inner}</section>
       <div class="nav">
@@ -213,6 +214,7 @@
       </div>`;
     app.querySelector("[data-home]").onclick = renderHome;
     app.querySelector("[data-help]").onclick = () => speak(STEP_SAY[step]);
+    app.querySelector("[data-pause]").onclick = togglePause;
     const back = app.querySelector("[data-back]"); if (back) back.onclick = () => { step--; renderStep(); };
     app.querySelector("[data-next]").onclick = () => { if (step < 4) { step++; renderStep(); } else finishLesson(); };
   }
@@ -229,13 +231,13 @@
   // ---------- guided flow: Fox says it once -> 5 s "your turn" -> next, by itself ----------
   const TURN_MS = 5000;
   let run = 0; // bumped on every screen change, so old timers/sequences stop
-  function sayThen(text, cb) {
+  function sayThen(text, cb, rate) {
     const my = run;
     let done = false;
     const fin = () => { if (done || my !== run) return; done = true; cb(); };
     if (!hasTTS) { setTimeout(fin, 1200); return; }
     speechSynthesis.cancel();
-    const u = utter(text);
+    const u = utter(text, null, rate);
     u.onend = fin; u.onerror = fin;
     speechSynthesis.speak(u);
     setTimeout(fin, 1800 + fill(text).length * 110); // safety net if the browser never fires onend
@@ -244,7 +246,7 @@
   function status(mode) {
     const st = app.querySelector(".status"); if (!st) return;
     st.className = "status " + mode;
-    st.querySelector("span").textContent = mode === "listen" ? "👂 Listen…" : mode === "turn" ? "🗣️ Your turn!" : "";
+    st.querySelector("span").textContent = mode === "listen" ? "👂 Listen…" : mode === "turn" ? "🗣️ Your turn!" : mode === "paused" ? "⏸️ Pause" : mode === "hear" ? "🎧 Fox is listening…" : "";
     const bar = st.querySelector(".bar"); bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
   }
   const statusHTML = `<div class="status"><span></span><div class="bar"></div></div>`;
@@ -255,20 +257,105 @@
     if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   // One item: Fox says it, then the child gets 5 seconds to repeat (or just listens for parent lines).
-  function teach(el, say, childTurn, cb) {
+  function teach(el, say, childTurn, cb, key) {
     focus(el); status("listen");
     sayThen(say, () => {
       if (!childTurn) { status(""); later(900, cb); return; }
+      if (listenOn()) { listenFor(el, key || say, say, 0, cb); return; }
       status("turn");
       later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); cb(); });
     });
   }
   // A list of items, starting at `from`. Tapping an item restarts from it.
+  // ---------- "Fox listens" (optional, parent-enabled) ----------
+  // Uses the browser's speech recognition. On most tablets the audio is processed by Google or Apple servers,
+  // which is why it is OFF by default and explained in the parent area. It never says "wrong".
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let listenBroken = false, activeRec = null;
+  const listenOn = () => !!(state.listen && SR && !listenBroken);
+  const NUM = { 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten" };
+  // Words recognisers often return for what a child said ("know" for "no", "for" for "four"…)
+  const ALIKE = { know: "no", knows: "nose", for: "four", to: "two", too: "two", won: "one", buy: "bye", by: "bye",
+    read: "red", blew: "blue", ate: "eight", hi: "hello", yeah: "yes", yep: "yes", nope: "no", sat: "sad" };
+  const norm = (t) => String(t).toLowerCase().replace(/[’']/g, "").replace(/\d+/g, (d) => " " + (NUM[d] || d) + " ")
+    .replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean).map((w) => ALIKE[w] || w);
+  function lev(a, b) {
+    const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[m][n];
+  }
+  // Lenient: at least half of the key words heard (one letter off is fine for longer words).
+  function heardIt(alts, key) {
+    const want = norm(key); if (!want.length) return true;
+    const wantJoined = want.join("");
+    return alts.some((alt) => {
+      const got = norm(alt);
+      const joined = got.join("");
+      if (joined.includes(wantJoined) || (wantJoined.length >= 6 && lev(joined, wantJoined) <= Math.round(wantJoined.length / 3))) return true;
+      const hits = want.filter((w) => got.some((g) => g === w || (w.length > 3 && lev(g, w) <= 1))).length;
+      return hits >= Math.ceil(want.length / 2);
+    });
+  }
+  function stopListening() { if (activeRec) { try { activeRec.abort(); } catch (e) { } activeRec = null; } }
+  function listenFor(el, key, say, tries, cb) {
+    const my = run;
+    status("hear");
+    let alts = null, finished = false, timer;
+    const R = new SR();
+    R.lang = "en-GB"; R.interimResults = false; R.maxAlternatives = 5; R.continuous = false;
+    R.onresult = (e) => { alts = Array.from(e.results[0] || []).map((a) => a.transcript); };
+    R.onerror = (e) => {
+      if (["not-allowed", "service-not-allowed", "network", "audio-capture"].includes(e.error)) {
+        listenBroken = true; toast("« Fox listens » indisponible ici : retour au mode 5 secondes.");
+      }
+    };
+    R.onend = () => {
+      clearTimeout(timer);
+      if (finished || my !== run) return;
+      finished = true; activeRec = null; status("");
+      if (listenBroken) { el.classList.add("heard"); cb(); return; }
+      if (alts && heardIt(alts, key)) {
+        el.classList.add("heard"); chime(true); confetti(10);
+        sayThen(PRAISE[Math.floor(Math.random() * PRAISE.length)], cb);
+      } else if (tries === 0) {
+        sayThen("Listen again!", () => sayThen(say, () => listenFor(el, key, say, 1, cb), 0.6));
+      } else {
+        el.classList.add("heard");
+        sayThen("Good try!", cb);
+      }
+    };
+    activeRec = R;
+    try { R.start(); } catch (e) { listenBroken = true; R.onend(); return; }
+    timer = setTimeout(() => { try { R.stop(); } catch (e) { } }, 6000);
+  }
+
+  let current = null;   // the guided sequence on screen, so Pause can resume it
+  let paused = false;
   function guide(items, from, onDone) {
-    run++;
-    let i = from;
-    const next = () => { if (i >= items.length) { focus(null); return onDone(); } const it = items[i++]; teach(it.el, it.say, it.turn !== false, next); };
+    run++; setPaused(false);
+    current = { items, idx: from, onDone };
+    const next = () => {
+      if (current.idx >= items.length) { focus(null); return onDone(); }
+      const it = items[current.idx];
+      teach(it.el, it.say, it.turn !== false, () => { current.idx++; next(); }, it.key);
+    };
     next();
+  }
+  function setPaused(on) {
+    paused = on;
+    const b = document.querySelector("[data-pause]");
+    if (b) { b.textContent = on ? "▶️" : "⏸️"; b.setAttribute("aria-label", on ? "Play" : "Pause"); b.classList.toggle("is-paused", on); }
+    app.classList.toggle("paused", on);
+  }
+  function togglePause() {
+    if (!paused) {
+      run++; stopListening(); if (hasTTS) speechSynthesis.cancel();
+      setPaused(true); status("paused");
+    } else if (current) {
+      guide(current.items, current.idx, current.onDone); // restart the word she was on
+    } else setPaused(false);
   }
   function showEnd(msg) {
     const end = app.querySelector(".endbar"); if (end) end.hidden = false;
@@ -290,7 +377,7 @@
       ${note(L.warmup.parent + " L'écran avance tout seul : le renard parle, puis 5 secondes pour répéter.")}`, true);
     const fox = app.querySelector("[data-fox]");
     const chips = [...app.querySelectorAll(".chip")];
-    const items = [{ el: fox, say: L.warmup.say }].concat(review.map((c, i) => ({ el: chips[i], say: c.say })));
+    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.word })));
     const go = (from) => guide(items, from, () => {
       confetti(12);
       sayThen("Great! Now, new words!", () => later(400, () => { step = 1; renderStep(); }));
@@ -310,7 +397,7 @@
       ${note("Laissez-la répéter pendant la barre rose (5 s), avec le geste. Touchez une image pour la réentendre. Montrez le sens avant de traduire ; un mot en français si elle bloque, puis on revient à l'anglais.")}`,
       false);
     const els = [...app.querySelectorAll(".word-card")];
-    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say }));
+    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.word }));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
     els.forEach((b, i) => b.onclick = () => go(i));
     app.querySelector("[data-again]").onclick = () => { els.forEach((e) => e.classList.remove("heard")); go(0); };
@@ -367,7 +454,7 @@
 
     if (gameDone) {
       const lines = [...app.querySelectorAll(".script-line")];
-      const items = L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent" }));
+      const items = L.speak.script.map((s, i) => ({ el: lines[i], say: line(s.line).replace("…", ""), turn: s.who !== "Parent", key: s.line.replace(/\{name\}\.?/g, "") }));
       const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
       app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(i));
       app.querySelector("[data-again]").onclick = () => go(0);
@@ -490,6 +577,10 @@
 
     app.innerHTML = `
       <div class="topbar"><button class="icon-btn" data-home aria-label="Home">🏠</button><h1 class="parent-title">Espace parent</h1><span></span></div>
+      <section class="panel"><h2>🎧 Fox listens</h2>
+        ${SR ? `<label class="skill"><input type="checkbox" data-listen ${state.listen ? "checked" : ""}> Le renard écoute si elle répète le mot</label>
+        <p class="small">Désactivé par défaut. Quand c'est activé, la tablette utilise la reconnaissance vocale du navigateur : sur la plupart des tablettes, la voix est envoyée aux serveurs de Google (Chrome / Android) ou d'Apple (Safari / iPad) pour être transformée en texte. Rien n'est enregistré par Hello Fox. La reconnaissance se trompe souvent avec les voix d'enfants : le renard ne dit jamais « faux », il fait réécouter une fois puis passe au mot suivant. À utiliser avec vous à côté d'elle.</p>`
+        : `<p class="small">Ce navigateur ne propose pas la reconnaissance vocale. Le mode 5 secondes reste utilisé.</p>`}</section>
       <section class="panel"><h2>Prénom affiché</h2>
         <p class="small">Enregistré uniquement sur cette tablette. Jamais envoyé ailleurs, jamais publié sur GitHub.</p>
         <input id="nm" maxlength="20" value="${esc(state.name)}" placeholder="Prénom">
@@ -514,6 +605,8 @@
         <p class="small">Pas de compte, pas de publicité, pas de statistiques. Le micro (« hear yourself ») enregistre en mémoire, rejoue, puis efface : rien n'est sauvegardé ni envoyé. La progression reste dans le navigateur de cette tablette ; effacer les données du navigateur l'efface.</p></section>`;
 
     app.querySelector("[data-home]").onclick = renderHome;
+    const lt = app.querySelector("[data-listen]");
+    if (lt) lt.onchange = () => { state.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? "Fox listens : activé" : "Fox listens : désactivé"); };
     app.querySelector("[data-savename]").onclick = () => {
       state.name = document.getElementById("nm").value.trim().slice(0, 20); save(); toast("Enregistré ✓");
     };

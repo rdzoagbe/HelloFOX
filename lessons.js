@@ -9,7 +9,7 @@ window.LESSONS = [
   {
     id: "w1d1", week: 1, day: "Monday", title: "Hello!", emoji: "👋", ready: true,
     warmup: {
-      say: "Hello, {name}! Can you say hello?",
+      say: "Hello, {name}! Can you say hello?", key: "hello",
       prompt: "Wave and say: Hello!",
       parent: "Faites un grand signe de la main avec elle. Un geste suffit si elle ne parle pas encore."
     },
@@ -35,7 +35,7 @@ window.LESSONS = [
   {
     id: "w1d2", week: 1, day: "Tuesday", title: "What's your name?", emoji: "🧸", ready: true,
     warmup: {
-      say: "Hello, {name}! My name is Fox. What's your name?",
+      say: "Hello, {name}! My name is Fox. What's your name?", key: "my name is",
       prompt: "Say: My name is …",
       parent: "Montrez-vous du doigt : « My name is Papa. » Puis montrez-la : « What's your name? ». Si elle répond juste son prénom, c'est parfait. Redites la phrase complète pour elle."
     },
@@ -62,7 +62,7 @@ window.LESSONS = [
   {
     id: "w1d3", week: 1, day: "Wednesday", title: "How are you?", emoji: "😊", ready: true,
     warmup: {
-      say: "Hello, {name}! How are you? I'm happy!",
+      say: "Hello, {name}! How are you? I'm happy!", key: "I'm happy",
       prompt: "Make a happy face!",
       parent: "Révision d'abord : « Hello! What's your name? ». Puis faites des grimaces ensemble : content, triste, fatigué."
     },
@@ -89,7 +89,7 @@ window.LESSONS = [
   {
     id: "w1d4", week: 1, day: "Thursday", title: "Numbers 1–5", emoji: "🖐️", ready: true,
     warmup: {
-      say: "One, two, three, four, five! Let's count, {name}!",
+      say: "One, two, three, four, five! Let's count, {name}!", key: "one two three",
       prompt: "Show me five fingers!",
       parent: "Révision : « How are you? ». Puis comptez sur vos doigts de 1 à 5 ensemble, lentement."
     },
@@ -116,7 +116,7 @@ window.LESSONS = [
   {
     id: "w1d5", week: 1, day: "Friday", title: "Colors", emoji: "🎨", ready: true,
     warmup: {
-      say: "Red, yellow, green, blue! Let's find colors, {name}!",
+      say: "Red, yellow, green, blue! Let's find colors, {name}!", key: "red",
       prompt: "Find something red!",
       parent: "Jeu « Color detective » : « Find something red! ». Elle court chercher un objet rouge. Puis c'est elle qui donne l'ordre."
     },

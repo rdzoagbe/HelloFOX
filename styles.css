@@ -232,3 +232,12 @@ button:focus-visible { outline: 4px solid var(--sky); outline-offset: 3px; }
 .endbar { display: flex; justify-content: center; margin-top: 18px; }
 .endbar[hidden] { display: none; }
 .again-btn { background: var(--card); border: 3px solid var(--sky); color: var(--ink); border-radius: 999px; padding: 0 28px; font-size: 24px; font-weight: 800; min-height: 72px; }
+
+.top-right { display: flex; gap: 10px; }
+[data-pause].is-paused { background: var(--sun); animation: pulse 1.2s infinite; }
+.status.paused span { color: var(--soft); }
+#app.paused .active { box-shadow: none; transform: none; }
+@media (max-width: 700px) { .icon-btn { width: 60px; height: 60px; font-size: 28px; } }
+
+.status.hear span { color: var(--leaf); animation: pulse .8s infinite; }
+.status.hear .bar { visibility: visible; background: var(--leaf); animation: shrink 6s linear forwards; }
