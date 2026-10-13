@@ -25,7 +25,7 @@
   function fresh(name) { return { name: name || "", stars: 0, lessons: {}, skills: {}, daily: { date: "", count: 0 } }; }
   function freshRoot() {
     const id = "p" + Date.now().toString(36);
-    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "" } };
+    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false } };
   }
   const obj = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
   function cleanData(d) {
@@ -51,7 +51,7 @@
     return { profiles, active: profiles.some((p) => p.id === r.active) ? r.active : profiles[0].id,
       settings: { listen: !!st.listen, code: /^\d{4}$/.test(st.code || "") ? st.code : "",
         limit: [0, 1, 2].includes(Number(st.limit)) ? Number(st.limit) : 0,
-        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10) } };
+        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone } };
   }
   function load() {
     try {
@@ -289,13 +289,176 @@
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault(); installEvt = e;
     if (app.querySelector("[data-start]")) renderHome();
+    if (app.querySelector(".landing")) renderLanding();
   });
-  window.addEventListener("appinstalled", () => { installEvt = null; toast("Hello Fox est installé ✓"); if (app.querySelector("[data-start]")) renderHome(); });
+  window.addEventListener("appinstalled", () => {
+    installEvt = null; toast("Hello Fox est installé ✓");
+    if (app.querySelector("[data-start]")) renderHome();
+    if (app.querySelector(".landing")) renderLanding(true);
+  });
   async function doInstall() {
     if (!installEvt) { parentGate(renderParent); return; }
+    const onLanding = !!app.querySelector(".landing");
     installEvt.prompt();
-    try { await installEvt.userChoice; } catch (e) { }
-    installEvt = null; renderHome();
+    let accepted = false;
+    try { accepted = (await installEvt.userChoice).outcome === "accepted"; } catch (e) { }
+    installEvt = null;
+    if (onLanding) renderLanding(accepted); else renderHome();
+  }
+
+  // =================== LANDING PAGE (browser, before installing) ===================
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const SHARE_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  const PLUS_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+  const DOTS_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>';
+  function renderLanding(justInstalled) {
+    hush();
+    const ios = isIOS();
+    const steps = ios
+      ? [[SHARE_SVG, "Touchez <b>Partager</b> en haut (ou en bas) de Safari."], [PLUS_SVG, "Choisissez <b>Sur l'écran d'accueil</b>."], [foxSVG("happy", 34), "Touchez <b>Ajouter</b>, puis ouvrez <b>Hello Fox</b> depuis l'écran d'accueil."]]
+      : [[DOTS_SVG, "Dans Chrome, touchez le menu <b>⋮</b> en haut à droite."], [PLUS_SVG, "Choisissez <b>Installer l'application</b> (ou <b>Ajouter à l'écran d'accueil</b>)."], [foxSVG("happy", 34), "Ouvrez <b>Hello Fox</b> depuis l'écran d'accueil."]];
+    app.innerHTML = `<div class="landing">
+      <section class="l-hero">
+        ${foxSVG("happy", 170)}
+        <h1>Hello Fox!</h1>
+        <p class="l-tag">L'anglais en jouant avec un renard, pour les enfants de 6 à 8 ans qui débutent.</p>
+      </section>
+      <section class="l-cards">
+        <div class="l-card"><h2>Le renard guide</h2><p>Il dit chaque mot, attend que l'enfant répète, puis passe au suivant. Presque rien à lire.</p></div>
+        <div class="l-card"><h2>20 leçons, 4 semaines</h2><p>Bonjour, couleurs, animaux, nourriture, famille. Chansons, jeux, autocollants et diplôme.</p></div>
+        <div class="l-card"><h2>Le parent décide</h2><p>Code parent, temps d'écran, votre propre voix, suivi des progrès, sauvegarde.</p></div>
+      </section>
+      <section class="l-install" id="install">
+        <h2>${justInstalled ? "C'est installé !" : "1. Installez Hello Fox sur la tablette"}</h2>
+        ${justInstalled ? `<p>Fermez cette page et ouvrez <b>Hello Fox</b> depuis l'écran d'accueil. La configuration commencera là.</p>`
+          : installEvt ? `<button class="big-start" data-install><span class="play-dot">${PLUS_SVG}</span><span class="s-text"><span class="s-main">Installer Hello Fox</span><span class="s-sub">Gratuit · sans compte · sans publicité</span></span></button>`
+          : `<ol class="l-steps">${steps.map(([ic, t], i) => `<li><span class="l-num">${i + 1}</span><span class="l-ic">${ic}</span><span>${t}</span></li>`).join("")}</ol>
+             ${ios ? `<p class="small">Sur iPad et iPhone, utilisez Safari. Important : faites la configuration <b>dans l'appli installée</b>, pas ici (Safari et l'appli ne partagent pas leurs données).</p>`
+                   : `<p class="small">Utilisez Chrome. Si le lien s'est ouvert dans WhatsApp, Facebook ou Gmail : menu → « Ouvrir dans Chrome ».</p>`}`}
+        <h2 class="l-h2b">2. Ouvrez l'appli et configurez-la</h2>
+        <p>Au premier lancement : votre code parent, le prénom de l'enfant et le temps d'écran. Deux minutes, puis vous lui donnez la tablette.</p>
+      </section>
+      <section class="l-privacy">
+        <h2>Confidentialité</h2>
+        <ul><li>Pas de compte, pas de publicité, pas de statistiques.</li>
+          <li>Les prénoms et les progrès restent sur cette tablette.</li>
+          <li>Les vidéos (Super Simple Songs) se lancent seulement après votre accord, dans un lecteur YouTube qui ne peut pas ouvrir d'autres pages.</li>
+          <li>Site familial, non commercial, non affilié à Super Simple ni au British Council.</li></ul>
+      </section>
+      <button class="l-browser" data-browser>Continuer dans le navigateur (parents)</button>
+    </div>`;
+    const ib = app.querySelector("[data-install]"); if (ib) ib.onclick = doInstall;
+    app.querySelector("[data-browser]").onclick = () => { try { sessionStorage.setItem("hf-browser", "1"); } catch (e) { } setupStep = 0; renderSetup(); };
+  }
+
+  // =================== FIRST-LAUNCH SETUP (done by the parent) ===================
+  let setupStep = 0, setupMsg = "";
+  function renderSetup() {
+    hush();
+    const st = root.settings;
+    const named = root.profiles.filter((p) => p.data.name);
+    const dots = [0, 1, 2, 3, 4].map((i) => `<span class="${i < setupStep ? "done" : i === setupStep ? "on" : ""}"></span>`).join("");
+    const colorPick = (sel) => COLORS.map((c, i) => `<label class="swatch" style="background:${c}"><input type="radio" name="kcolor" value="${c}" ${c === sel ? "checked" : ""}><span class="sr">Couleur ${i + 1}</span></label>`).join("");
+    const nextColor = COLORS[named.length % COLORS.length];
+    const pages = [
+      () => `<div class="s-fox">${foxSVG("happy", 150)}</div>
+        <h1>Bienvenue !</h1>
+        <p>Configurons Hello Fox en deux minutes. Cette partie est pour vous, le parent : l'enfant ne la verra pas.</p>
+        <ul class="s-list"><li>Tout reste sur cette tablette : pas de compte, pas de publicité.</li><li>Vous pourrez tout changer plus tard dans l'espace parent.</li></ul>
+        <div class="s-actions"><button class="s-primary" data-go="1">Commencer</button>
+        <label class="s-ghost" for="rest">J'ai une sauvegarde</label><input id="rest" type="file" accept="application/json,.json" class="sr"></div>`,
+      () => `<h1>Votre code parent</h1>
+        <p>4 chiffres pour ouvrir l'espace parent et confirmer les vidéos. Choisissez un code que l'enfant ne connaît pas.</p>
+        <div class="s-form">
+          <label for="c1">Code (4 chiffres)</label><input id="c1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
+          <label for="c2">Retapez le code</label><input id="c2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="">
+        </div>
+        ${st.code ? `<p class="small">Un code existe déjà. Laissez vide pour le garder.</p>` : ""}
+        <div class="s-actions"><button class="s-ghost" data-go="0">Retour</button><button class="s-primary" data-code>Continuer</button></div>`,
+      () => `<h1>Qui va apprendre ?</h1>
+        <p>Le prénom s'affiche et le renard le dit. Ajoutez chaque enfant de la maison.</p>
+        ${named.length ? `<div class="s-kids">${named.map((p) => `<span class="s-kid"><span class="avatar" style="background:${p.color}">${esc(p.data.name.slice(0, 1).toUpperCase())}</span>${esc(p.data.name)}</span>`).join("")}</div>` : ""}
+        <div class="s-form">
+          <label for="kname">${named.length ? "Ajouter un autre enfant (facultatif)" : "Prénom de l'enfant"}</label>
+          <input id="kname" maxlength="20" autocomplete="off" placeholder="Prénom">
+          <fieldset class="swatches"><legend>Couleur</legend>${colorPick(nextColor)}</fieldset>
+          <button class="s-ghost" data-addk>Ajouter</button>
+        </div>
+        <div class="s-actions"><button class="s-ghost" data-go="1">Retour</button><button class="s-primary" data-kids ${named.length ? "" : "disabled"}>Continuer</button></div>`,
+      () => `<h1>Réglages</h1>
+        <fieldset class="segs"><legend>Temps d'écran : leçons par jour</legend>
+          ${[[1, "1"], [2, "2"], [0, "Sans limite"]].map(([v, t]) => `<label class="seg ${st.limit === v ? "on" : ""}"><input type="radio" name="slimit" value="${v}" ${st.limit === v ? "checked" : ""}>${t}</label>`).join("")}</fieldset>
+        <p class="small">Une leçon dure environ 30 minutes avec vous. Quand la limite est atteinte, le renard dit « See you tomorrow! ».</p>
+        ${SR ? `<label class="skill"><input type="checkbox" id="slisten" ${st.listen ? "checked" : ""}> Fox listens : le renard écoute si l'enfant répète</label>
+        <p class="small">Désactivé par défaut : la voix est alors transformée en texte par les serveurs de Google (Android) ou d'Apple (iPad).</p>` : ""}
+        <div class="s-actions"><button class="s-ghost" data-go="2">Retour</button><button class="s-primary" data-sets>Continuer</button></div>`,
+      () => `<div class="s-fox">${foxSVG("talk", 170)}</div>
+        <h1>C'est prêt !</h1>
+        <p>Donnez la tablette à ${esc(named.map((p) => p.data.name).join(" et ") || "votre enfant")}. Le renard s'occupe du reste.</p>
+        <p class="small">Astuce : pour que l'enfant reste dans l'appli, activez l'Accès guidé (iPad, Réglages → Accessibilité) ou l'épinglage d'application (Android, Réglages → Sécurité).</p>
+        <div class="s-actions"><button class="s-ghost" data-go="3">Retour</button><button class="s-primary big" data-done>C'est parti !</button></div>`
+    ];
+    app.innerHTML = `<div class="setup"><div class="s-dots" aria-label="Étape ${setupStep + 1} sur 5">${dots}</div>
+      <section class="s-card">${pages[setupStep]()}${setupMsg ? `<p class="s-msg" role="alert">${esc(setupMsg)}</p>` : ""}</section></div>`;
+    setupMsg = "";
+    const go = (n) => { setupStep = n; renderSetup(); };
+    app.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(Number(b.dataset.go)));
+    const fail = (m) => { setupMsg = m; renderSetup(); };
+
+    const rest = app.querySelector("#rest");
+    if (rest) rest.onchange = async (e) => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      let data = null;
+      try { data = f.size < 2000000 ? cleanRoot(JSON.parse(await f.text())) : null; } catch (err) { data = null; }
+      if (!data) return fail("Ce fichier n'est pas une sauvegarde Hello Fox.");
+      data.settings.setupDone = false; data.settings.code = st.code;
+      root = data; state = profile().data; save();
+      toast("Sauvegarde restaurée ✓ " + data.profiles.map((p) => p.data.name).filter(Boolean).join(", "));
+      go(1);
+    };
+    const cb = app.querySelector("[data-code]");
+    if (cb) cb.onclick = () => {
+      const a = app.querySelector("#c1").value.trim(), b = app.querySelector("#c2").value.trim();
+      if (!a && !b && st.code) return go(2);
+      if (!/^\d{4}$/.test(a)) return fail("Le code doit avoir exactement 4 chiffres.");
+      if (a !== b) return fail("Les deux codes ne sont pas identiques.");
+      st.code = a; save(); go(2);
+    };
+    const ak = app.querySelector("[data-addk]");
+    if (ak) {
+      const add = () => {
+        const name = app.querySelector("#kname").value.trim().slice(0, 20);
+        if (!name) return fail("Écrivez un prénom.");
+        if (root.profiles.length >= 8 && !root.profiles.some((p) => !p.data.name)) return fail("8 enfants maximum.");
+        const color = (app.querySelector('input[name="kcolor"]:checked') || {}).value || nextColor;
+        const empty = root.profiles.find((p) => !p.data.name);
+        if (empty) { empty.data.name = name; empty.color = color; }
+        else root.profiles.push({ id: "p" + Date.now().toString(36), color, data: fresh(name) });
+        if (!profile().data.name) root.active = root.profiles.find((p) => p.data.name).id;
+        state = profile().data; save(); renderSetup();
+      };
+      ak.onclick = add;
+      app.querySelector("#kname").onkeydown = (e) => { if (e.key === "Enter") add(); };
+    }
+    const kb = app.querySelector("[data-kids]");
+    if (kb) kb.onclick = () => {
+      const typed = app.querySelector("#kname").value.trim();
+      if (typed) return fail("Touchez « Ajouter » pour ajouter " + typed + ", ou effacez le prénom.");
+      go(3);
+    };
+    app.querySelectorAll('input[name="slimit"]').forEach((r) => r.onchange = () => { st.limit = Number(r.value); save(); renderSetup(); });
+    const sb = app.querySelector("[data-sets]");
+    if (sb) sb.onclick = () => { const l = app.querySelector("#slisten"); if (l) st.listen = l.checked; save(); go(4); };
+    const done = app.querySelector("[data-done]");
+    if (done) done.onclick = () => {
+      // keep only named children (the empty starter profile is dropped)
+      root.profiles = root.profiles.filter((p) => p.data.name);
+      if (!root.profiles.some((p) => p.id === root.active)) root.active = root.profiles[0].id;
+      state = profile().data;
+      st.setupDone = true; save(); homeWeek = null;
+      if (root.profiles.length > 1) renderWho();
+      else { renderHome(); speak(`Hello, ${childName()}! I'm Fox. Let's learn English!`); }
+    };
   }
 
   // =================== HOME: adventure map, one island per week ===================
@@ -1073,7 +1236,7 @@
       if (!data) { toast("Ce fichier n'est pas une sauvegarde Hello Fox."); return; }
       const kids = data.profiles.map((p) => p.data.name || "?").join(", ");
       if (!confirm("Remplacer la progression actuelle par celle du fichier ?\nEnfants : " + kids)) return;
-      data.settings.code = st.code; // keep this tablet's code
+      data.settings.code = st.code; data.settings.setupDone = true; // keep this tablet's code; already set up
       root = data; state = profile().data; save(); homeWeek = null;
       renderParent(); toast("Sauvegarde restaurée ✓");
     };
@@ -1124,7 +1287,14 @@
   }
 
   // ---------- boot ----------
-  renderHome();
+  // Not set up yet: in the installed app (or "continue in browser") -> parent setup; otherwise -> landing page.
+  function boot() {
+    if (root.settings.setupDone) return renderHome();
+    let browserOK = false;
+    try { browserOK = sessionStorage.getItem("hf-browser") === "1"; } catch (e) { }
+    if (standalone() || browserOK) { setupStep = 0; renderSetup(); } else renderLanding();
+  }
+  boot();
   voiceAll();
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

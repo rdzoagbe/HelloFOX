@@ -32,6 +32,12 @@ In `lessons.js`, copy the structure of `w1d1` into the lesson you want (e.g. `w1
 fill in `warmup`, `cards`, `video`, `speak`, `skill`, then set `ready: true`.
 Then in `sw.js` change `VERSION` (e.g. `hellofox-v2`) so tablets pick up the update.
 
+## First launch
+1. Open the site in the browser: a parent landing page explains Hello Fox and how to install it (Chrome install button on Android, picture steps for Safari on iPad).
+2. Open the installed app: a 5-step parent setup (welcome / restore a backup, parent code typed twice, children with a colour, screen time and Fox listens, hand-over screen).
+3. Setup runs in the installed app on purpose: on iPad/iPhone the home-screen app does not share data with Safari.
+"Continuer dans le navigateur" at the bottom of the landing page runs the same setup in the browser.
+
 ## What's new in the redesign
 - Drawn fox (moves its mouth while speaking), map home screen, rounded Fredoka/Nunito fonts hosted in the project (no Google Fonts request).
 - Several children: "Who's playing?" profiles, each with its own stars, stickers and progress.
