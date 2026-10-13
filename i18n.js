@@ -3,6 +3,9 @@
 window.I18N = {
   en: {
     lang_label: "Language", back_home: "Back to the home page",
+    p_sfx_h: "Sound & effects", p_sfx: "Sound effects (soft chimes)", p_calm: "Calm mode: no confetti or bouncing animations",
+    p_sfx_p: "Fox's voice always stays on: it is the lesson.",
+    p_practise: "Words to practise", p_practise_none: "None yet. Words missed in the games will appear here, and Fox brings them back in the warm-up.",
     // landing
     l_tag: "Learn English by playing with a friendly fox. For beginners aged 6 to 8.",
     l_c1_t: "The fox leads the way", l_c1: "Fox says each word, waits for your child to repeat it, then moves on. Almost nothing to read.",
@@ -102,6 +105,9 @@ window.I18N = {
   },
   fr: {
     lang_label: "Langue", back_home: "Retour à la page d'accueil",
+    p_sfx_h: "Sons et effets", p_sfx: "Effets sonores (petits « ding » doux)", p_calm: "Mode calme : pas de confettis ni d'animations qui bougent",
+    p_sfx_p: "La voix du renard reste toujours active : c'est la leçon.",
+    p_practise: "Mots à retravailler", p_practise_none: "Aucun pour l'instant. Les mots ratés dans les jeux apparaîtront ici, et le renard les reprend en début de leçon.",
     l_tag: "L'anglais en jouant avec un renard, pour les enfants de 6 à 8 ans qui débutent.",
     l_c1_t: "Le renard guide", l_c1: "Il dit chaque mot, attend que l'enfant répète, puis passe au suivant. Presque rien à lire.",
     l_c2_t: "20 leçons, 4 semaines", l_c2: "Bonjour, couleurs, animaux, nourriture, famille. Chansons, jeux, autocollants et diplôme.",

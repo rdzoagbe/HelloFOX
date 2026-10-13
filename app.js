@@ -22,16 +22,18 @@
   // ---------- storage: several children (profiles) + family settings, all on this device ----------
   const STORE_KEY = "hellofox-v2", OLD_KEY = "my-english-v1";
   const COLORS = ["#7C6CF2", "#E8661F", "#2E8A52", "#D6336C", "#2B7BD6"];
-  function fresh(name) { return { name: name || "", stars: 0, lessons: {}, skills: {}, daily: { date: "", count: 0 } }; }
+  function fresh(name) { return { name: name || "", stars: 0, lessons: {}, skills: {}, weak: {}, daily: { date: "", count: 0 } }; }
   function freshRoot() {
     const id = "p" + Date.now().toString(36);
-    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false, lang: "en" } };
+    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false, lang: "en", sfx: true, calm: false } };
   }
   const obj = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
   function cleanData(d) {
     d = obj(d);
     const daily = obj(d.daily);
-    return { name: String(d.name || "").slice(0, 20), stars: Math.max(0, Math.floor(Number(d.stars) || 0)), lessons: obj(d.lessons), skills: obj(d.skills),
+    const weak = {};
+    Object.entries(obj(d.weak)).slice(0, 300).forEach(([k, v]) => { if (/^w\d+d\d+:\d+$/.test(k)) weak[k] = Math.max(0, Math.min(9, Number(v) || 0)); });
+    return { name: String(d.name || "").slice(0, 20), stars: Math.max(0, Math.floor(Number(d.stars) || 0)), lessons: obj(d.lessons), skills: obj(d.skills), weak,
       daily: { date: String(daily.date || "").slice(0, 10), count: Math.max(0, Number(daily.count) || 0) } };
   }
   // Accepts this app's saved data, a backup file, or the older single-child format. Anything else -> null.
@@ -51,7 +53,7 @@
     return { profiles, active: profiles.some((p) => p.id === r.active) ? r.active : profiles[0].id,
       settings: { listen: !!st.listen, code: /^\d{4}$/.test(st.code || "") ? st.code : "",
         limit: [0, 1, 2].includes(Number(st.limit)) ? Number(st.limit) : 0,
-        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en" } };
+        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en", sfx: st.sfx !== false, calm: !!st.calm } };
   }
   function load() {
     try {
@@ -73,6 +75,17 @@
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const lessonsToday = () => (state.daily && state.daily.date === today()) ? state.daily.count : 0;
   const canPlay = () => !root.settings.limit || lessonsToday() < root.settings.limit;
+
+  // ---------- smart review: words missed in games come back more often (per child) ----------
+  // key = "<lesson id>:<card index>"; score goes up on a miss, down when it's got right or reviewed.
+  const wk = (l, i) => l.id + ":" + i;
+  function miss(k) { if (!k) return; state.weak = state.weak || {}; state.weak[k] = Math.min(9, (state.weak[k] || 0) + 2); save(); }
+  function hit(k) { if (!k || !state.weak || !state.weak[k]) return; state.weak[k] = Math.max(0, state.weak[k] - 1); if (!state.weak[k]) delete state.weak[k]; save(); }
+  function cardOf(k) { const [id, i] = k.split(":"); const l = LESSONS.find((x) => x.id === id); return l && l.cards[Number(i)] ? { l, c: l.cards[Number(i)], k } : null; }
+  function weakest(n, exceptLesson) {
+    return Object.entries(state.weak || {}).filter(([k, v]) => v > 0 && !k.startsWith(exceptLesson + ":"))
+      .sort((a, b) => b[1] - a[1]).map(([k]) => cardOf(k)).filter(Boolean).slice(0, n);
+  }
 
   // ---------- parent-facing language (EN | FR). The child's lessons are always in English. ----------
   const lang = () => (root.settings.lang === "fr" ? "fr" : "en");
@@ -185,7 +198,7 @@
     };
     next();
   }
-  const hush = () => { run++; current = null; if (typeof stopAudio === "function") stopAudio(); if (typeof stopListening === "function") stopListening(); if (hasTTS) speechSynthesis.cancel(); talking(false); if (typeof setPaused === "function") setPaused(false); };
+  const hush = () => { run++; current = null; if (typeof stopYT === "function") stopYT(); if (typeof stopAudio === "function") stopAudio(); if (typeof stopListening === "function") stopListening(); if (hasTTS) speechSynthesis.cancel(); talking(false); if (typeof setPaused === "function") setPaused(false); };
 
   // ---------- Fox, drawn (one character everywhere). Mood: happy | talk | surprised | calm | sleepy ----------
   function foxSVG(mood, size) {
@@ -221,6 +234,13 @@
     again: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v5h5"/></svg>'
   };
 
+  // Picture for a word card: a drawing when one exists (art.js), else the emoji.
+  function pic(c, size) {
+    const z = size || 96;
+    const art = window.ART && c.art !== false && window.ART[c.word];
+    return art ? `<span class="art" style="width:${z}px;height:${z}px" aria-hidden="true">${art}</span>` : `<span class="e" aria-hidden="true">${c.emoji}</span>`;
+  }
+
   // ---------- small helpers ----------
   let toastTimer;
   function toast(msg) {
@@ -228,20 +248,24 @@
     t.textContent = msg; t.classList.add("show");
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
   }
+  // Soft two-note "ding" (right) or one low note (try again). Switched off in the parent area if wanted.
   function chime(ok) {
+    if (root.settings.sfx === false) return;
     try {
       const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
       const ctx = chime.ctx || (chime.ctx = new C());
-      const notes = ok ? [523, 659, 784] : [220];
+      const notes = ok ? [659, 880] : [392];
       notes.forEach((f, i) => {
-        const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + i * 0.1;
-        o.frequency.value = f; o.type = "triangle";
-        g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-        o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.32);
+        const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + i * 0.12;
+        o.frequency.value = f; o.type = "sine";
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(ok ? 0.09 : 0.05, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + (ok ? 0.45 : 0.3));
+        o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.5);
       });
     } catch (e) { /* sound is optional */ }
   }
   function confetti(n) {
+    if (root.settings.calm) return;
     const bits = ["🎉", "⭐", "✨", "🎈", "💛", "🌟"];
     for (let i = 0; i < n; i++) {
       const s = document.createElement("span");
@@ -707,7 +731,7 @@
       if (!childTurn) { status(""); later(900, cb); return; }
       if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
       status(act ? "act" : "turn");
-      later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); cb(); });
+      later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); const it = current && current.items[current.idx]; if (it && it.review) hit(it.ck); cb(); });
     });
   }
   // A list of items, starting at `from`. Tapping an item restarts from it.
@@ -760,12 +784,15 @@
       if (finished || my !== run) return;
       finished = true; activeRec = null; status("");
       if (listenBroken) { el.classList.add("heard"); cb(); return; }
+      const it = current && current.items[current.idx];
       if (alts && heardIt(alts, key)) {
+        if (it) hit(it.ck);
         el.classList.add("heard"); chime(true); confetti(10);
         sayThen(PRAISE[Math.floor(Math.random() * PRAISE.length)], cb);
       } else if (tries === 0) {
         sayThen("Listen again!", () => sayThen(say, () => listenFor(el, key, say, 1, cb), 0.6));
       } else {
+        if (it) miss(it.ck);
         el.classList.add("heard");
         sayThen("Good try!", cb);
       }
@@ -809,7 +836,10 @@
   // 1. Hello: one greeting, her turn, quick review of yesterday's words, then on to new words automatically
   function stepHello() {
     const prev = previousLesson(L);
-    const review = prev ? shuffle(prev.cards).slice(0, 3) : [];
+    const picked = weakest(2, L.id);
+    const fromPrev = prev ? shuffle(prev.cards.map((c, i) => ({ l: prev, c, k: wk(prev, i) }))).filter((x) => !picked.some((p) => p.k === x.k)) : [];
+    const reviewItems = picked.concat(fromPrev).slice(0, 3);
+    const review = reviewItems.map((x) => x.c);
     frame(`
       <div class="bubble"></div>
       <button class="hello-fox" data-fox aria-label="Fox">${foxSVG("happy", 200)}</button>
@@ -817,12 +847,12 @@
       <div class="prompt">${esc(fill(L.warmup.prompt))}</div>
       ${statusHTML}
       ${review.length ? `<div class="review"><div class="review-title">Remember?</div>
-        ${review.map((c, i) => `<button class="chip" data-i="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>` : ""}
+        ${review.map((c, i) => `<button class="chip" data-i="${i}">${pic(c, 34)}${esc(c.word)}</button>`).join("")}</div>` : ""}
       <div class="endbar"><button class="again-btn" data-again>${ICON.again} Again</button></div>
       ${note(pt(L, "parent") + t("n_hello_auto"))}`, true);
     const fox = app.querySelector("[data-fox]");
     const chips = [...app.querySelectorAll(".chip")];
-    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.key || c.word })));
+    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.key || c.word, ck: reviewItems[i].k, review: true })));
     const go = (from) => guide(items, from, () => {
       confetti(12);
       sayThen("Great! Now, new words!", () => later(400, () => { step = 1; renderStep(); }));
@@ -836,7 +866,7 @@
   // 2. Learn: each word is said once, 5 s to repeat, then the next one. At the end: again or next?
   function stepLearn() {
     const cards = L.cards.map((c, i) => `<button class="word-card" data-i="${i}">
-      <span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`).join("");
+      ${pic(c, 110)}${esc(c.word)}</button>`).join("");
     frame(`<div class="learn">
       <aside class="side-fox"><div class="bubble"></div><button class="fox-btn" data-fox aria-label="Fox">${foxSVG("happy", 220)}</button>${statusHTML}</aside>
       <div class="cards cards-2">${cards}</div></div>
@@ -844,7 +874,7 @@
       ${note(t("n_learn"))}`,
       false);
     const els = [...app.querySelectorAll(".word-card")];
-    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word }));
+    const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word, ck: wk(L, i) }));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
     els.forEach((b, i) => b.onclick = () => go(i));
     app.querySelector("[data-fox]").onclick = () => go(current ? current.idx : 0);
@@ -854,6 +884,8 @@
 
   // 3. Watch: YouTube's official embeddable player, loaded after a parent confirms (once per session)
   const videoOK = () => root.settings.videoDay === today();
+  let ytListener = null;
+  function stopYT() { if (ytListener) { window.removeEventListener("message", ytListener); ytListener = null; } }
   function stepWatch() {
     const v = L.video;
     frame(`<h2>Watch & sing</h2>${minutes()}
@@ -866,15 +898,48 @@
       <div class="row-btns center"><button class="link-btn" data-alt>Sing with Fox</button></div>
       ${note(t("n_watch"))}`, true);
     speak(STEP_SAY[2]);
-    const load = () => {
+    const YT = "https://www.youtube-nocookie.com";
+    const load = (auto) => {
       root.settings.videoDay = today(); save(); hush();
       // Sandboxed: the player can play, but cannot open YouTube, new tabs or navigate this app away.
-      document.getElementById("vbox").innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.youtubeId)}?rel=0&playsinline=1&modestbranding=1&fs=1"
+      // enablejsapi lets the page hear "video ended" through postMessage (no YouTube script is added to the page).
+      const box = document.getElementById("vbox");
+      box.innerHTML = `<iframe src="${YT}/embed/${encodeURIComponent(v.youtubeId)}?rel=0&playsinline=1&modestbranding=1&fs=1&enablejsapi=1${auto ? "&autoplay=1" : ""}&origin=${encodeURIComponent(location.origin)}"
         title="${esc(v.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
         sandbox="allow-scripts allow-same-origin allow-presentation"
         referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+      const frame = box.querySelector("iframe");
+      const my = run;
+      let heard = false, tries = 0;
+      const send = (o) => { try { frame.contentWindow.postMessage(JSON.stringify(Object.assign({ id: 1, channel: "widget" }, o)), YT); } catch (e) { } };
+      const hello = () => {
+        if (heard || my !== run || tries++ > 40) return;
+        send({ event: "listening" }); send({ event: "command", func: "addEventListener", args: ["onStateChange"] });
+        setTimeout(hello, 500);
+      };
+      frame.addEventListener("load", hello);
+      ytListener = (e) => {
+        if (e.origin !== YT || my !== run) return;
+        let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (err) { return; }
+        if (!d) return;
+        heard = true;
+        const ended = (d.event === "onStateChange" && d.info === 0) || (d.event === "infoDelivery" && d.info && d.info.playerState === 0);
+        if (ended) videoEnded();
+      };
+      window.addEventListener("message", ytListener);
     };
-    app.querySelector("[data-load]").onclick = () => videoOK() ? load() : parentGate(load);
+    // Instead of YouTube's suggested videos: Fox asks "again, or next?"
+    const videoEnded = () => {
+      stopYT();
+      document.getElementById("vbox").innerHTML = `<div class="video-gate video-end">${foxSVG("happy", 120)}
+        <div class="row-btns center"><button class="listen-btn" data-again-v>${ICON.again}<span>Watch again</span></button>
+        <button class="next-btn video-next" data-next-v>Next ▶</button></div></div>`;
+      confetti(14); chime(true);
+      sayThen("Well done! Watch again, or next?", () => { });
+      app.querySelector("[data-again-v]").onclick = () => load(true);
+      app.querySelector("[data-next-v]").onclick = () => { step++; renderStep(); };
+    };
+    app.querySelector("[data-load]").onclick = () => videoOK() ? load(true) : parentGate(() => load(true));
     app.querySelector("[data-alt]").onclick = () => speakLines(L.chant || L.cards.map((c) => c.say));
   }
 
@@ -889,7 +954,7 @@
     talkPart();
   }
   function gameOver() { play.gameDone = true; later(1300, stepPlay); }
-  const cardBtn = (c, i, cls) => `<button class="word-card ${cls || ""}" data-i="${i}"><span class="e" aria-hidden="true">${c.emoji}</span>${esc(c.word)}</button>`;
+  const cardBtn = (c, i, cls) => `<button class="word-card ${cls || ""}" data-i="${i}">${pic(c, 110)}${esc(c.word)}</button>`;
 
   // Listen & tap — or Fox's café, where Fox orders and she serves
   function tapGame(cafe) {
@@ -912,13 +977,16 @@
     app.querySelector("[data-q]").onclick = ask;
     app.querySelectorAll(".word-card").forEach((b) => b.onclick = () => {
       if (play.locked) return;
+      const ck = cafe ? null : wk(L, order[play.round]);
       if (items[Number(b.dataset.i)] === it) {
+        if (firstTry) hit(ck);
         play.locked = true;
         b.classList.add("right"); chime(true); confetti(firstTry ? 10 : 5);
         speak(cafe ? ["Thank you!", "Yummy! Thank you!", "Thank you very much!"][play.round % 3] : PRAISE[play.round % PRAISE.length]);
         play.round++;
         later(1300, () => { play.locked = false; stepPlay(); });
       } else {
+        if (firstTry) miss(ck);
         firstTry = false; b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong");
         chime(false); later(500, ask);
       }
@@ -931,7 +999,7 @@
     const tiles = shuffle(cards.concat(cards).map((c, k) => ({ c, k: k % cards.length })));
     frame(`<h2>Find the pairs!</h2>${minutes()}
       <div class="mem-grid">${tiles.map((t, i) => `<button class="mem" data-t="${i}" aria-label="card"><span class="back">${foxSVG("calm", 76)}</span>
-        <span class="front"><span class="e">${t.c.emoji}</span>${esc(t.c.word)}</span></button>`).join("")}</div>
+        <span class="front">${pic(t.c, 70)}${esc(t.c.word)}</span></button>`).join("")}</div>
       ${note(t("n_memory"))}`, false);
     sayThen("Find the pairs!", () => { });
     let open = [], found = 0, busy = false;
@@ -969,7 +1037,7 @@
       <div class="cards look">${shown.map((c, i) => cardBtn(c, i, "still")).join("")}</div>
       <div class="cover" hidden>${foxSVG("sleepy", 180)}Close your eyes!</div>
       <div class="pick" hidden><div class="prompt">What's missing?</div><div class="pick-row">${shuffle(shown.map((c, i) => ({ c, i }))).map(({ c, i }) =>
-        `<button class="chip" data-p="${i}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div></div>
+        `<button class="chip" data-p="${i}">${pic(c, 34)}${esc(c.word)}</button>`).join("")}</div></div>
       ${note(t("n_missing"))}`, false);
     const look = app.querySelector(".look"), cover = app.querySelector(".cover"), pick = app.querySelector(".pick");
     sayThen(play.miss === 0 ? "Look! Remember the pictures!" : "Look again!", () => later(2500, () => {
@@ -981,11 +1049,15 @@
         sayThen("Open your eyes! What's missing?", () => { });
       }));
     }));
+    let firstPick = true;
     app.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => {
       if (Number(b.dataset.p) === gone) {
+        if (firstPick) hit(wk(L, gone));
         b.classList.add("right"); chime(true); confetti(10);
         sayThen("Yes! " + shown[gone].say, () => { play.miss++; later(500, stepPlay); });
       } else {
+        if (firstPick) miss(wk(L, gone));
+        firstPick = false;
         b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong"); chime(false); speak("Look again!");
       }
     });
@@ -1044,7 +1116,7 @@
     frame(`<div class="dance">${foxSVG("happy", 200)}</div>
       <h2>Well done, ${esc(childName())}!</h2>${minutes()}
       <div class="score" aria-label="3 stars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
-      <div class="review">${L.cards.map((c) => `<button class="chip" data-r="${esc(c.say)}"><span>${c.emoji}</span>${esc(c.word)}</button>`).join("")}</div>
+      <div class="review">${L.cards.map((c) => `<button class="chip" data-r="${esc(c.say)}">${pic(c, 34)}${esc(c.word)}</button>`).join("")}</div>
       <button class="listen-btn" data-bye>${ICON.ear}<span>Goodbye!</span></button>
       <div class="parent-note" hidden><b>${t("for_parent")} — ${esc(pt(L, "skill"))}</b>
         ${t("n_stars")}
@@ -1147,6 +1219,9 @@
           <div class="bar"><i style="width:${pct(doneN, ready.length)};background:#F4862C"></i></div>
           <div class="bar-row"><span>${t("p_friday")}</span><span data-tick>${ticked} / 16</span></div>
           <div class="bar"><i data-tickbar style="width:${pct(ticked, 16)};background:#3FAE6B"></i></div>
+          <div class="practise"><b>${t("p_practise")}</b>
+            ${weakest(6).length ? `<div class="p-words">${weakest(6).map((x) => `<span class="chip small-chip">${pic(x.c, 28)}${esc(x.c.word)}</span>`).join("")}</div>`
+              : `<p class="small">${t("p_practise_none")}</p>`}</div>
           <a href="#skills" class="more">${t("p_see_skills")}</a>
         </section>
 
@@ -1177,6 +1252,12 @@
           <div class="bar"><i style="width:${pct(recN, uniq.length)};background:#7C6CF2"></i></div>
           <a href="#voice" class="more">${t("p_record_words")}</a>
           ${SR ? `<label class="skill"><input type="checkbox" data-listen ${st.listen ? "checked" : ""}> ${t("p_listen_label")}</label>` : ""}
+        </section>
+
+        <section class="card"><h2>${t("p_sfx_h")}</h2>
+          <label class="skill"><input type="checkbox" data-sfx ${st.sfx !== false ? "checked" : ""}> ${t("p_sfx")}</label>
+          <label class="skill"><input type="checkbox" data-calm ${st.calm ? "checked" : ""}> ${t("p_calm")}</label>
+          <p class="small">${t("p_sfx_p")}</p>
         </section>
       </div>
 
@@ -1285,6 +1366,8 @@
     };
     vl.onchange = vrows; vrows();
     const cp = app.querySelector("[data-certprev]"); if (cp) cp.onclick = renderCertificate;
+    app.querySelector("[data-sfx]").onchange = (e) => { st.sfx = e.target.checked; save(); if (st.sfx) chime(true); toast(t("t_saved")); };
+    app.querySelector("[data-calm]").onchange = (e) => { st.calm = e.target.checked; save(); applyCalm(); toast(t("t_saved")); };
     const lt = app.querySelector("[data-listen]");
     if (lt) lt.onchange = () => { st.listen = lt.checked; listenBroken = false; save(); toast(lt.checked ? t("t_listen_on") : t("t_listen_off")); };
     app.querySelector("[data-savename]").onclick = () => {
@@ -1305,7 +1388,9 @@
 
   // ---------- boot ----------
   // Not set up yet: in the installed app (or "continue in browser") -> parent setup; otherwise -> landing page.
+  const applyCalm = () => document.body.classList.toggle("calm", !!root.settings.calm);
   function boot() {
+    applyCalm();
     if (root.settings.setupDone) return renderHome();
     let browserOK = false;
     try { browserOK = sessionStorage.getItem("hf-browser") === "1"; } catch (e) { }
