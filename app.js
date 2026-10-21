@@ -40,6 +40,21 @@
   }
   // Accepts this app's saved data, a backup file, or the older single-child format. Anything else -> null.
   function cleanRoot(r) {
+  // Import validation is stricter than normal storage migration: reject empty or malformed profile records
+  // before replacing existing family data. Keep accepting the older single-child backup format.
+  function cleanBackup(r) {
+    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+    if (Array.isArray(r.profiles)) {
+      if (r.profiles.length < 1 || r.profiles.length > 8) return null;
+      const validProfiles = r.profiles.every((p) => {
+        if (!p || typeof p !== "object" || Array.isArray(p) || !p.data || typeof p.data !== "object" || Array.isArray(p.data)) return false;
+        return ["name", "stars", "lessons", "skills", "weak", "daily"].some((k) => Object.prototype.hasOwnProperty.call(p.data, k));
+      });
+      if (!validProfiles) return null;
+    } else if (!("stars" in r) && !("lessons" in r)) return null;
+    return cleanRoot(r);
+  }
+
     if (!r || typeof r !== "object") return null;
     if (!Array.isArray(r.profiles)) {
       if (!("stars" in r) && !("lessons" in r)) return null;
@@ -497,7 +512,7 @@
     if (rest) rest.onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       let data = null;
-      try { data = f.size < 2000000 ? cleanRoot(JSON.parse(await f.text())) : null; } catch (err) { data = null; }
+      try { data = f.size < 2000000 ? cleanBackup(JSON.parse(await f.text())) : null; } catch (err) { data = null; }
       if (!data) return fail(t("e_not_backup"));
       data.settings.setupDone = false; data.settings.code = st.code; data.settings.lang = st.lang;
       root = data; state = profile().data; save();
@@ -1573,7 +1588,7 @@
       const f = e.target.files && e.target.files[0]; if (!f) return;
       if (f.size > 2000000) { toast(t("t_too_big")); return; }
       let data = null;
-      try { data = cleanRoot(JSON.parse(await f.text())); } catch (err) { data = null; }
+      try { data = cleanBackup(JSON.parse(await f.text())); } catch (err) { data = null; }
       if (!data) { toast(t("e_not_backup")); return; }
       if (!confirm(t("t_replace_q", { kids: data.profiles.map((p) => p.data.name || "?").join(", ") }))) return;
       data.settings.code = st.code; data.settings.setupDone = true; data.settings.lang = st.lang; // keep this tablet's code and language
