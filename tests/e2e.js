@@ -284,6 +284,23 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     const exported = await p.evaluate(() => localStorage.getItem("hellofox-v2"));
     check(JSON.parse(exported).settings.lang === "fr", "the language choice is saved");
     await p.context().close();
+
+    // ---------- 4. Invalid backups must never replace existing family data ----------
+    console.log("Backup validation");
+    p = await newPage("backup-validation", {}, seeded({ code: "1234" }));
+    await p.click("[data-parent]");
+    for (const d of "1234") await p.click('.keypad [data-k="' + d + '"]');
+    await p.waitForTimeout(250);
+    await p.setInputFiles("#impfile", {
+      name: "malformed-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ profiles: [{}], settings: {} }))
+    });
+    await p.waitForTimeout(250);
+    const afterInvalidImport = await store(p);
+    check(afterInvalidImport.profiles[0].data.name === "Keren", "a malformed backup is rejected without replacing the existing child profile");
+    check(afterInvalidImport.settings.code === "1234", "a malformed backup cannot overwrite the existing parent code");
+    await p.context().close();
   } catch (e) {
     check(false, "test run crashed: " + e.message.split("\n")[0]);
   }
