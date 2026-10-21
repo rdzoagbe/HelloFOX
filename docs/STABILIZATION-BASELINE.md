@@ -21,6 +21,7 @@
 - Presence of service-worker cache files and local scripts in the offline shell
 - New-user setup, profile creation, persistence after reload, Level 1 and Level 2 lesson journeys, language switching, review of missed words, video messaging and selected parent settings
 - Browser console/page errors during the automated Chromium run
+- Responsive-layout smoke checks at 320, 360, 390, 430 and 768 CSS pixels, including lesson navigation at 320px
 
 ## What CI does not prove
 
