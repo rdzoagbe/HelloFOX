@@ -300,6 +300,26 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     const afterInvalidImport = await store(p);
     check(afterInvalidImport.profiles[0].data.name === "Keren", "a malformed backup is rejected without replacing the existing child profile");
     check(afterInvalidImport.settings.code === "1234", "a malformed backup cannot overwrite the existing parent code");
+
+    p.on("dialog", (dialog) => dialog.accept());
+    const validBackup = {
+      app: "hellofox",
+      profiles: [{ id: "restored", color: "#7C6CF2", data: {
+        name: "Restored", stars: 2, lessons: {}, skills: {}, weak: {}, daily: { date: "", count: 0 }
+      }}],
+      active: "restored",
+      settings: { setupDone: true, code: "9999", lang: "en", limit: 0 }
+    };
+    await p.setInputFiles("#impfile", {
+      name: "valid-hellofox-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(validBackup))
+    });
+    await p.waitForTimeout(350);
+    const afterValidImport = await store(p);
+    check(afterValidImport.profiles[0].data.name === "Restored", "a valid backup restores the saved child profile");
+    check(afterValidImport.profiles[0].data.stars === 2, "a valid backup restores learning progress");
+    check(afterValidImport.settings.code === "1234", "restoring a backup preserves this device's existing parent code");
     await p.context().close();
   } catch (e) {
     check(false, "test run crashed: " + e.message.split("\n")[0]);
