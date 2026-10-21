@@ -40,21 +40,6 @@
   }
   // Accepts this app's saved data, a backup file, or the older single-child format. Anything else -> null.
   function cleanRoot(r) {
-  // Import validation is stricter than normal storage migration: reject empty or malformed profile records
-  // before replacing existing family data. Keep accepting the older single-child backup format.
-  function cleanBackup(r) {
-    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
-    if (Array.isArray(r.profiles)) {
-      if (r.profiles.length < 1 || r.profiles.length > 8) return null;
-      const validProfiles = r.profiles.every((p) => {
-        if (!p || typeof p !== "object" || Array.isArray(p) || !p.data || typeof p.data !== "object" || Array.isArray(p.data)) return false;
-        return ["name", "stars", "lessons", "skills", "weak", "daily"].some((k) => Object.prototype.hasOwnProperty.call(p.data, k));
-      });
-      if (!validProfiles) return null;
-    } else if (!("stars" in r) && !("lessons" in r)) return null;
-    return cleanRoot(r);
-  }
-
     if (!r || typeof r !== "object") return null;
     if (!Array.isArray(r.profiles)) {
       if (!("stars" in r) && !("lessons" in r)) return null;
@@ -74,6 +59,21 @@
         open: Array.isArray(st.open) ? st.open.filter((n) => [2, 3].includes(n)) : [],
         voice: String(st.voice || "").slice(0, 200), speed: ["slow", "normal", "quick"].includes(st.speed) ? st.speed : "normal" } };
   }
+  // Import validation is stricter than normal storage migration: reject empty or malformed profile records
+  // before replacing existing family data. Keep accepting the older single-child backup format.
+  function cleanBackup(r) {
+    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+    if (Array.isArray(r.profiles)) {
+      if (r.profiles.length < 1 || r.profiles.length > 8) return null;
+      const validProfiles = r.profiles.every((p) => {
+        if (!p || typeof p !== "object" || Array.isArray(p) || !p.data || typeof p.data !== "object" || Array.isArray(p.data)) return false;
+        return ["name", "stars", "lessons", "skills", "weak", "daily"].some((k) => Object.prototype.hasOwnProperty.call(p.data, k));
+      });
+      if (!validProfiles) return null;
+    } else if (!("stars" in r) && !("lessons" in r)) return null;
+    return cleanRoot(r);
+  }
+
   function load() {
     try {
       const r = cleanRoot(JSON.parse(localStorage.getItem(STORE_KEY)));
