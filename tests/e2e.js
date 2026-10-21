@@ -284,6 +284,74 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     const exported = await p.evaluate(() => localStorage.getItem("hellofox-v2"));
     check(JSON.parse(exported).settings.lang === "fr", "the language choice is saved");
     await p.context().close();
+
+    // ---------- 4. Invalid backups must never replace existing family data ----------
+    console.log("Backup validation");
+    p = await newPage("backup-validation", {}, seeded({ code: "1234" }));
+    await p.click("[data-parent]");
+    for (const d of "1234") await p.click('.keypad [data-k="' + d + '"]');
+    await p.waitForTimeout(250);
+    await p.setInputFiles("#impfile", {
+      name: "malformed-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ profiles: [{}], settings: {} }))
+    });
+    await p.waitForTimeout(250);
+    const afterInvalidImport = await store(p);
+    check(afterInvalidImport.profiles[0].data.name === "Keren", "a malformed backup is rejected without replacing the existing child profile");
+    check(afterInvalidImport.settings.code === "1234", "a malformed backup cannot overwrite the existing parent code");
+
+    p.on("dialog", (dialog) => dialog.accept());
+    const validBackup = {
+      app: "hellofox",
+      profiles: [{ id: "restored", color: "#7C6CF2", data: {
+        name: "Restored", stars: 2, lessons: {}, skills: {}, weak: {}, daily: { date: "", count: 0 }
+      }}],
+      active: "restored",
+      settings: { setupDone: true, code: "9999", lang: "en", limit: 0 }
+    };
+    await p.setInputFiles("#impfile", {
+      name: "valid-hellofox-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(validBackup))
+    });
+    await p.waitForTimeout(350);
+    const afterValidImport = await store(p);
+    check(afterValidImport.profiles[0].data.name === "Restored", "a valid backup restores the saved child profile");
+    check(afterValidImport.profiles[0].data.stars === 2, "a valid backup restores learning progress");
+    check(afterValidImport.settings.code === "1234", "restoring a backup preserves this device's existing parent code");
+    await p.context().close();
+
+    // ---------- 5. Mobile layout smoke checks at narrow phone and tablet widths ----------
+    console.log("Mobile layout");
+    p = await newPage("mobile-layout", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, seeded({}));
+    for (const width of [320, 360, 390, 430, 768]) {
+      await p.setViewportSize({ width, height: 844 });
+      await p.waitForTimeout(100);
+      const metrics = await p.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        document: document.documentElement.scrollWidth,
+        app: document.querySelector("#app")?.getBoundingClientRect().width || 0
+      }));
+      check(metrics.document <= metrics.viewport + 1,
+        `no horizontal page overflow at ${width}px (viewport ${metrics.viewport}px, document ${metrics.document}px)`);
+      check(metrics.app <= width + 1,
+        `app container fits the ${width}px viewport`);
+    }
+    await p.setViewportSize({ width: 320, height: 720 });
+    await p.click("[data-start]");
+    await p.waitForTimeout(150);
+    const lessonMetrics = await p.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+      next: document.querySelector("[data-next]")?.getBoundingClientRect().toJSON()
+    }));
+    check(lessonMetrics.document <= lessonMetrics.viewport + 1,
+      "lesson screen has no horizontal overflow on a 320px phone viewport");
+    check(!!lessonMetrics.next && lessonMetrics.next.width > 0 &&
+      lessonMetrics.next.left >= -1 && lessonMetrics.next.right <= lessonMetrics.viewport + 1,
+      "lesson navigation remains visible on a narrow phone viewport");
+    await p.context().close();
   } catch (e) {
     check(false, "test run crashed: " + e.message.split("\n")[0]);
   }

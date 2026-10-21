@@ -1,71 +1,76 @@
 # Hello Fox! — beginner English PWA
 
-A tablet-friendly, installable web app for a 6-year-old French-speaking beginner. The full 4-week course (20 lessons) is playable: talking fox with guided 5-second turns, pause, optional "Fox listens" speech check, games (listen & tap, Fox's café, memory pairs, what's missing?, Simon says), sticker book, parent voice recordings, Friday speaking check and a printable certificate.
-The other 19 lessons are listed and locked. Each one follows the same 5-step template.
+Hello Fox is an installable, tablet-friendly English-learning app for young French-speaking beginners. It contains **40 lessons across two levels**: Level 1 builds vocabulary and listening confidence; Level 2 adds picture stories, comprehension questions and guided conversations. The app includes a talking fox, guided turns, optional speech checks, learning games, stickers, parent voice recordings, progress tracking and printable certificates.
+
+The app is built as static files: there is no build step, application server, user account or analytics service. Child profiles and progress are stored in the browser's local storage on the device.
 
 ## What's included
+
 | File | Role |
 |---|---|
-| `index.html` | Page shell |
-| `styles.css` | Child-friendly tablet layout (big touch targets) |
-| `app.js` | Home, lesson player, parent area, progress |
-| `lessons.js` | **All lesson content.** Edit this to add lessons |
-| `manifest.webmanifest`, `sw.js`, `icons/` | Makes it installable + works offline |
-| `.nojekyll` | Tells GitHub Pages to serve files as-is |
+| `index.html` | Page shell, metadata and security policy |
+| `styles.css` | Responsive, child-friendly interface |
+| `app.js` | Home, lesson player, parent area, progress and settings |
+| `lessons.js`, `level2.js` | Level 1 and Level 2 lesson content |
+| `missions.js`, `i18n.js` | Parent missions and English/French interface text |
+| `art.js`, `art2.js` | Lesson illustrations |
+| `manifest.webmanifest`, `sw.js`, `icons/` | PWA installation and app-shell caching |
+| `tests/` | Static checks and automated Chromium browser journeys |
 
-No build step, no framework, no server, no account, no analytics.
+## Live app
 
-## Publish on GitHub Pages
-1. Create a new repository on GitHub (this one: `HelloFOX`). On a free account it must be **public**.
-2. Upload every file and the `icons` folder to the root of the `main` branch.
-3. Repository **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save**.
-4. After about a minute the site is live at `https://rdzoagbe.github.io/HelloFOX/`.
+GitHub Pages publishes the app at [https://rdzoagbe.github.io/HelloFOX/](https://rdzoagbe.github.io/HelloFOX/).
 
-## Install on the tablet
-- **iPad (Safari):** open the link → Share button → **Add to Home Screen**.
-- **Android (Chrome):** open the link → ⋮ menu → **Install app** / **Add to Home screen**.
+## Install on a device
 
-It then opens full-screen like an app. After the first visit, the lessons work offline (videos still need internet).
+- **iPhone or iPad (Safari):** open the app URL, tap **Share**, then **Add to Home Screen**.
+- **Android (Chrome):** open the app URL, then use **Install app** or **Add to Home screen** from the browser menu.
 
-## Add the next lesson
-In `lessons.js`, copy the structure of `w1d1` into the lesson you want (e.g. `w1d2`):
-fill in `warmup`, `cards`, `video`, `speak`, `skill`, then set `ready: true`.
-Then in `sw.js` change `VERSION` (e.g. `hellofox-v2`) so tablets pick up the update.
+Installation and offline behavior can differ between browsers and operating-system versions. Validate both on the actual target devices before relying on them. The app shell is cached for offline use; embedded YouTube videos require an internet connection.
 
-## Languages
-Parent-facing screens (landing page, setup, parent area, parent tips) switch between **English and French** with the EN | FR button; English is the default. The child's lessons are always in English. Texts live in `i18n.js` (app) and `window.PARENT_EN` in `lessons.js` (per-lesson parent tips).
+## First launch and family setup
 
-## First launch
-1. Open the site in the browser: a parent landing page explains Hello Fox and how to install it (Chrome install button on Android, picture steps for Safari on iPad).
-2. Open the installed app: a 5-step parent setup (welcome / restore a backup, parent code typed twice, children with a colour, screen time and Fox listens, hand-over screen).
-3. Setup runs in the installed app on purpose: on iPad/iPhone the home-screen app does not share data with Safari.
-"Continuer dans le navigateur" at the bottom of the landing page runs the same setup in the browser.
+1. Open the site in a browser. The landing page explains the app and installation.
+2. Complete the parent setup in the installed app: create the parent code, add child profiles and choose settings.
+3. On iPhone/iPad, the Home Screen app and Safari may have separate browser storage. Complete setup in the environment where the family will use the app. The landing page also offers a way to continue in the browser.
 
-## What's new in the redesign
-- Drawn fox (moves its mouth while speaking), map home screen, rounded Fredoka/Nunito fonts hosted in the project (no Google Fonts request).
-- Several children: "Who's playing?" profiles, each with its own stars, stickers and progress.
-- Parent area: 4-digit parent code, screen-time limit (1 or 2 lessons a day), backup Export **and Import**, voice recordings, Fox listens.
-- Security: Content-Security-Policy (only this site + the YouTube no-cookie player), YouTube player sandboxed so it cannot open YouTube or other pages, parent check for videos once a day.
-- Tip: lock the tablet on the app with Guided Access (iPad) or App pinning (Android).
+## Learning levels
 
-## Level 2 (weeks 5 to 8)
+- **Level 1 (weeks 1–4):** vocabulary, listening, guided speaking, games and review.
+- **Level 2 (weeks 5–8):** new sentences, Listen & Tap, picture stories, comprehension questions, guided conversations and a parent English mission.
+- Level 2 normally unlocks after Level 1 is completed; the parent area can also unlock it earlier.
 
-After the 20 first lessons, Level 2 moves from repeating words to answering and talking. Each lesson:
-hello, new sentences (Listen and repeat), Listen & tap, a picture story (she turns the pages), "Fox asks" (she answers first, then Fox shows a good answer), "Talk with Fox" (a little scene where she picks what to say) and stars.
-Level 2 opens when Level 1 is finished, or earlier from the parent area. Every lesson ends with a short "English mission" for the parent, and the can-do checklist covers all 8 weeks.
-Content: `level2.js` (lessons), `missions.js` (missions), `art2.js` (drawings).
+Lesson content lives in `lessons.js` and `level2.js`. Supporting missions and illustrations live in `missions.js`, `art.js` and `art2.js`. When editing lesson data, preserve the data shape expected by the app and run the full test suite before publishing.
+
+## Parent features
+
+- Multiple child profiles, each with their own progress, stars and stickers.
+- A parent area protected by a locally stored 4-digit code.
+- Daily lesson limits, calm mode and sound settings.
+- Backup export and import.
+- Parent voice recordings and settings for the optional “Fox listens” speech check.
+
+**Important security limitation:** the parent code is a convenience gate, not strong security against someone with access to the device or browser storage. It should not be used to protect sensitive information.
 
 ## Automatic checks
 
-Every update to `main` runs the checks in `tests/` on GitHub (tab **Actions**, workflow "Automatic checks").
-A green tick means the site still works: all 20 lessons, setup, EN | FR, videos, review of missed words and parent settings.
-A red cross means something broke; open the run to see which check failed.
+The **Automatic checks** workflow runs on pushes to `main`, pull requests and manual dispatch. It runs JavaScript syntax and lesson/content checks, verifies the offline shell file list, and exercises key journeys in automated Chromium.
 
-To run them on a computer: `npm install`, `npx playwright install chromium`, then `npm test`.
+To run the suite locally:
 
-## Privacy and legal notes
-- The child's first name is typed in the **Parent area** and stays only on the tablet (browser storage). It is never in the code, so it is never public on GitHub.
-- Progress is stored only on the device. Clearing the browser data erases it. Use **Export** in the parent area for a backup.
-- Videos play through YouTube's official embedded player (`youtube-nocookie.com`), only after a parent confirms. No video file is copied or hosted here.
-- Super Simple Songs and British Council content belong to their owners. Their pages are linked, not copied. This site is not affiliated with them.
-- The site is for personal, non-commercial family use. Do not add ads or charge for it (GitHub Pages and the content owners' terms do not allow that).
+```sh
+npm ci
+npx playwright install chromium
+npm test
+```
+
+A green CI result confirms that the automated checks passed in their test environment. It does **not** replace physical-device testing on Android Chrome and iPhone/iPad Safari, including installation, offline startup, speech features, storage persistence and app updates.
+
+## Privacy and limitations
+
+- Child names and progress are stored in local browser storage. They are not synchronised between devices. Clearing site data can erase progress; export a backup regularly and verify that it can be restored.
+- Speech playback and speech recognition depend on browser and device support. The speech check is optional and should not be treated as a definitive pronunciation assessment.
+- Videos use YouTube's embedded no-cookie player and require internet access. A third-party video provider may still process connection data when a video is played.
+- The project links to third-party learning content and is not affiliated with those content owners.
+
+Before wider distribution, review the privacy notice, third-party content permissions and the suitability of all learning materials for the intended audience.
