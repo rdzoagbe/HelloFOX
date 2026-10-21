@@ -1,5 +1,5 @@
 // Offline support: caches the app shell. Bump VERSION whenever you change a file.
-const VERSION = "hellofox-v16";
+const VERSION = "hellofox-v17";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "lessons.js", "i18n.js", "art.js", "manifest.webmanifest",
   "fonts/fonts.css", "fonts/fredoka-latin-600-normal.woff2", "fonts/fredoka-latin-700-normal.woff2",

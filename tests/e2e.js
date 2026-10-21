@@ -149,6 +149,23 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(said.filter((t) => t === "Hello!").length === 1 && said.filter((t) => t === "Goodbye!").length === 1, "in the dialogue Fox says each line once, then it's her turn");
     await p.context().close();
 
+    // ---------- 2c. Lesson opening: Fox announces the lesson, no "repeat after me" ----------
+    console.log("Lesson opening");
+    p = await newPage("opening", {}, { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 0, lessons: { w1d1: { status: "done" } } } }] });
+    await p.evaluate(() => {
+      window.__said = []; window.__turns = 0;
+      speechSynthesis.speak = (u) => { window.__said.push(u.text); setTimeout(() => u.onend && u.onend(), 120); };
+      new MutationObserver(() => { const st = document.querySelector(".status"); if (st && /turn/.test(st.className) && document.querySelector(".hello-fox")) window.__turns++; })
+        .observe(document.body, { subtree: true, attributes: true, childList: true });
+    });
+    await p.click('[data-lesson="w1d2"]');
+    await p.waitForFunction(() => window.__said.includes("Listen, and repeat!"), null, { timeout: 20000 }).catch(() => {});
+    const open = await p.evaluate(() => ({ said: window.__said, turns: window.__turns }));
+    check(/^Lesson 2! /.test(open.said[0] || ""), "opening a lesson, Fox announces it (\"" + (open.said[0] || "nothing") + "\")");
+    check(open.turns === 0, "the lesson opening never waits for her to repeat");
+    check(!open.said.some((t) => ["Hello!", "Goodbye!", "Yes!", "No!"].includes(t)), "the opening does not replay the previous lesson's words");
+    await p.context().close();
+
     // ---------- 3. Video end screen, smart review, sound settings, languages ----------
     console.log("Video, review and parent settings");
     p = await newPage("features", {}, seeded({ code: "1234" }));
@@ -175,7 +192,7 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     await forceNext(p); await p.waitForTimeout(300); await p.click("[data-next]"); await p.waitForTimeout(400);
     if (await p.$("[data-ok]")) { await p.click("[data-ok]"); await p.click("[data-home]"); }
     await p.click("[data-start]"); await p.waitForTimeout(300);
-    check((await p.$$(".review .chip")).length > 0, "missed words come back in the next lesson's warm-up");
+    check((await p.$$(".review .chip")).length > 0, "missed words are shown as \"Remember?\" words in the next lesson");
     await p.click("[data-home]");
     await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(200);
     check((await p.$$(".p-words .chip")).length > 0, "the parent area lists words to practise");

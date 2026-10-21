@@ -729,7 +729,7 @@
     const bub = app.querySelector(".bubble"); if (bub) bub.textContent = fill(say).split(/(?<=[.!?])\s/)[0];
     // silent: she has just heard this exact line, so Fox does not repeat it before her turn
     (silent ? (f) => later(300, f) : (f) => sayThen(say, f))(() => {
-      if (!childTurn) { status(""); later(900, cb); return; }
+      if (!childTurn) { status(""); const it = current && current.items[current.idx]; later((it && it.gap) || 900, cb); return; }
       if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
       status(act ? "act" : "turn");
       later(TURN_MS, () => { el.classList.add("heard"); status(""); chime(true); const it = current && current.items[current.idx]; if (it && it.review) hit(it.ck); cb(); });
@@ -834,13 +834,13 @@
     enableNext(); sayThen(msg, () => {});
   }
 
-  // 1. Hello: one greeting, her turn, quick review of yesterday's words, then on to new words automatically
+  // 1. Hello: Fox announces the lesson and greets her. No "repeat after me" here: that is only for the new words.
+  // Words to review are shown as optional "Remember?" chips: a tap says the word once, nothing more.
   function stepHello() {
     const prev = previousLesson(L);
     const picked = weakest(2, L.id);
     const fromPrev = prev ? shuffle(prev.cards.map((c, i) => ({ l: prev, c, k: wk(prev, i) }))).filter((x) => !picked.some((p) => p.k === x.k)) : [];
-    const reviewItems = picked.concat(fromPrev).slice(0, 3);
-    const review = reviewItems.map((x) => x.c);
+    const review = picked.concat(fromPrev).slice(0, 3).map((x) => x.c);
     frame(`
       <div class="bubble"></div>
       <button class="hello-fox" data-fox aria-label="Fox">${foxSVG("happy", 200)}</button>
@@ -849,18 +849,16 @@
       ${statusHTML}
       ${review.length ? `<div class="review"><div class="review-title">Remember?</div>
         ${review.map((c, i) => `<button class="chip" data-i="${i}">${pic(c, 34)}${esc(c.word)}</button>`).join("")}</div>` : ""}
-      <div class="endbar"><button class="again-btn" data-again>${ICON.again} Again</button></div>
       ${note(pt(L, "parent") + t("n_hello_auto"))}`, true);
     const fox = app.querySelector("[data-fox]");
-    const chips = [...app.querySelectorAll(".chip")];
-    const items = [{ el: fox, say: L.warmup.say, key: L.warmup.key }].concat(review.map((c, i) => ({ el: chips[i], say: c.say, key: c.key || c.word, ck: reviewItems[i].k, review: true })));
-    const go = (from) => guide(items, from, () => {
-      confetti(12);
-      sayThen("Great! Now, new words!", () => later(400, () => { step = 1; renderStep(); }));
-    });
-    chips.forEach((c, i) => c.onclick = () => go(i + 1));
+    const num = LESSONS.indexOf(L) + 1;
+    const title = L.title.replace(/(\d)\s*[–-]\s*(\d)/g, "$1 to $2");
+    // turn: false = Fox only speaks, no waiting for her to repeat. A short pause after the greeting lets her answer if she wants.
+    const items = [{ el: fox, say: `Lesson ${num}! ${title}${/[!?.]$/.test(title) ? "" : "!"}`, turn: false },
+                   { el: fox, say: L.warmup.say, turn: false, gap: 2500 }];
+    const go = (from) => guide(items, from, () => sayThen("Now, new words!", () => later(400, () => { step = 1; renderStep(); })));
+    app.querySelectorAll(".chip").forEach((c, i) => c.onclick = () => speak(review[i].say));
     fox.onclick = () => go(0);
-    app.querySelector("[data-again]").onclick = () => go(0);
     later(300, () => go(0));
   }
 
@@ -971,7 +969,7 @@
       <div class="cards">${cards}</div>
       ${cafe ? note(t("n_cafe")) : ""}`, false);
     const it = items[order[play.round]];
-    let firstTry = true;
+    let firstTry = true, reAsk = 0;
     const ask = () => speak(cafe ? (it.order || it.say) : (it.ask && play.round % 2 === 1 ? it.ask : it.say));
     if (play.round === 0) sayThen(cafe ? "Welcome to my café! I'm hungry!" : STEP_SAY[3], () => later(300, ask));
     else later(300, ask);
@@ -989,7 +987,8 @@
       } else {
         if (firstTry) miss(ck);
         firstTry = false; b.classList.remove("wrong"); void b.offsetWidth; b.classList.add("wrong");
-        chime(false); later(500, ask);
+        // Quick wrong taps: Fox says the word again only once, after the last tap
+        const me = ++reAsk; chime(false); later(500, () => me === reAsk && ask());
       }
     });
   }
