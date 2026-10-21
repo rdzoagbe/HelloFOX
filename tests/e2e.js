@@ -321,6 +321,37 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(afterValidImport.profiles[0].data.stars === 2, "a valid backup restores learning progress");
     check(afterValidImport.settings.code === "1234", "restoring a backup preserves this device's existing parent code");
     await p.context().close();
+
+    // ---------- 5. Mobile layout smoke checks at narrow phone and tablet widths ----------
+    console.log("Mobile layout");
+    p = await newPage("mobile-layout", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, seeded({}));
+    for (const width of [320, 360, 390, 430, 768]) {
+      await p.setViewportSize({ width, height: 844 });
+      await p.waitForTimeout(100);
+      const metrics = await p.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        document: document.documentElement.scrollWidth,
+        app: document.querySelector("#app")?.getBoundingClientRect().width || 0
+      }));
+      check(metrics.document <= metrics.viewport + 1,
+        `no horizontal page overflow at ${width}px (viewport ${metrics.viewport}px, document ${metrics.document}px)`);
+      check(metrics.app <= width + 1,
+        `app container fits the ${width}px viewport`);
+    }
+    await p.setViewportSize({ width: 320, height: 720 });
+    await p.click("[data-start]");
+    await p.waitForTimeout(150);
+    const lessonMetrics = await p.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+      next: document.querySelector("[data-next]")?.getBoundingClientRect().toJSON()
+    }));
+    check(lessonMetrics.document <= lessonMetrics.viewport + 1,
+      "lesson screen has no horizontal overflow on a 320px phone viewport");
+    check(!!lessonMetrics.next && lessonMetrics.next.width > 0 &&
+      lessonMetrics.next.left >= -1 && lessonMetrics.next.right <= lessonMetrics.viewport + 1,
+      "lesson navigation remains visible on a narrow phone viewport");
+    await p.context().close();
   } catch (e) {
     check(false, "test run crashed: " + e.message.split("\n")[0]);
   }
