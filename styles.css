@@ -642,3 +642,29 @@ body.calm .tap-next { animation: none; }
   .ask-wrap { flex-direction: column; } .side-fox.small { flex: none; }
   .page-text { font-size: 26px; } .msg .txt { font-size: 21px; }
 }
+
+/* ---------- Very small phones (320-400px): nothing may stick out sideways ---------- */
+.topbar > * { flex-shrink: 0; }
+.topbar .steps { flex: 1 1 auto; min-width: 0; justify-content: center; }
+.steps span { flex: 0 1 64px; min-width: 8px; }
+.cards { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
+.word-card { min-width: 0; }
+.word-card .art { max-width: 100%; }
+@media (max-width: 700px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) {
+  .icon-btn { width: 52px; height: 52px; }
+  .steps { gap: 5px; }
+  .word-card { padding-left: 6px; padding-right: 6px; font-size: 18px; overflow-wrap: anywhere; }
+  .word-card .art { width: 84px !important; height: 84px !important; }
+}
+.page-pics { flex-wrap: wrap; max-width: 100%; }
+@media (max-width: 500px) {
+  .page-pics { gap: 8px; padding: 10px; }
+  .page-pics .art { width: min(150px, 36vw) !important; height: min(150px, 36vw) !important; }
+  .page-text { font-size: 22px; }
+  .q-cards { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px; }
+}
+@media (max-width: 500px) {
+  .tap-next { position: static; margin: 10px auto 0; width: 68px; height: 68px; }
+  .tap-next svg { width: 36px; height: 36px; }
+}
