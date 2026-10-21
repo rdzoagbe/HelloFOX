@@ -56,7 +56,8 @@
       settings: { listen: !!st.listen, code: /^\d{4}$/.test(st.code || "") ? st.code : "",
         limit: [0, 1, 2].includes(Number(st.limit)) ? Number(st.limit) : 0,
         lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en", sfx: st.sfx !== false, calm: !!st.calm,
-        open: Array.isArray(st.open) ? st.open.filter((n) => [2, 3].includes(n)) : [] } };
+        open: Array.isArray(st.open) ? st.open.filter((n) => [2, 3].includes(n)) : [],
+        voice: String(st.voice || "").slice(0, 200), speed: ["slow", "normal", "quick"].includes(st.speed) ? st.speed : "normal" } };
   }
   function load() {
     try {
@@ -122,17 +123,35 @@
   // ---------- speech (built-in browser voice, runs on the device) ----------
   let voice = null;
   const hasTTS = "speechSynthesis" in window;
+  // The tablet's own voices. Some are "fun" robot voices (Eddy, Grandma, Zarvox…): never pick those.
+  // Natural / enhanced / neural voices and well-known clear English voices come first. A parent can choose another one.
+  const SILLY = /eloquence|eddy|flo\b|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy|hysterical|espeak|novelty/i;
+  function voiceScore(v) {
+    if (!/^en/i.test(v.lang)) return -1;
+    let n = 0;
+    if (/en[-_]GB/i.test(v.lang)) n += 4; else if (/en[-_](US|AU|IE|CA|NZ)/i.test(v.lang)) n += 2;
+    if (/natural|neural|enhanced|premium|online|wavenet|studio/i.test(v.name)) n += 6;
+    if (/google/i.test(v.name)) n += 3;
+    if (/daniel|serena|kate|martha|arthur|stephanie|libby|sonia|ryan|maisie|thomas|samantha|karen|moira|aria|jenny|ava|zoe/i.test(v.name)) n += 3;
+    if (/compact/i.test(v.name)) n -= 2;
+    if (SILLY.test(v.name)) n -= 20;
+    return n;
+  }
+  const englishVoices = () => (hasTTS ? speechSynthesis.getVoices() : []).filter((v) => voiceScore(v) >= 0)
+    .sort((a, b) => voiceScore(b) - voiceScore(a));
   function pickVoice() {
     if (!hasTTS) return;
-    const vs = speechSynthesis.getVoices();
-    voice = vs.find((v) => /en-GB/i.test(v.lang)) || vs.find((v) => /^en/i.test(v.lang)) || null;
+    const list = englishVoices();
+    const chosen = root.settings.voice && list.find((v) => v.voiceURI === root.settings.voice);
+    voice = chosen || list[0] || null;
   }
   if (hasTTS) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
   function utter(text, pitch, rate) {
     const u = new SpeechSynthesisUtterance(fill(text));
     u.lang = voice ? voice.lang : "en-GB";
-    if (voice) u.voice = voice;
-    u.rate = rate || 0.8; u.pitch = pitch || 1.1;
+    if (voice) { try { u.voice = voice; } catch (e) { /* voice no longer available: device default */ } }
+    const base = { slow: 0.75, normal: 0.85, quick: 0.95 }[root.settings.speed] || 0.85;
+    u.rate = rate ? base * rate : base; u.pitch = pitch || 1;
     u.addEventListener("start", () => talking(true));
     u.addEventListener("end", () => talking(false));
     u.addEventListener("error", () => talking(false));
@@ -196,7 +215,7 @@
     let k = 0;
     const next = () => {
       if (k >= lines.length) return;
-      const u = utter(lines[k++], 1.2);
+      const u = utter(lines[k++], 1.1);
       u.onend = () => setTimeout(next, gap || 900);
       speechSynthesis.speak(u);
     };
@@ -824,7 +843,7 @@
         el.classList.add("heard"); chime(true); confetti(10);
         sayThen(PRAISE[Math.floor(Math.random() * PRAISE.length)], cb);
       } else if (tries === 0) {
-        sayThen("Listen again!", () => sayThen(say, () => listenFor(el, key, say, 1, cb), 0.6));
+        sayThen("Listen again!", () => sayThen(say, () => listenFor(el, key, say, 1, cb), 0.8));
       } else {
         if (it) miss(it.ck);
         el.classList.add("heard");
@@ -1465,6 +1484,17 @@
           ${SR ? `<label class="skill"><input type="checkbox" data-listen ${st.listen ? "checked" : ""}> ${t("p_listen_label")}</label>` : ""}
         </section>
 
+        <section class="card"><h2>${t("p_fox_voice_h")}</h2>
+          ${(() => { const list = englishVoices(); if (!list.length) return `<p class="small">${t("p_voice_none")}</p>`;
+            const cur = voice ? voice.voiceURI : "";
+            return `<label class="sr" for="vsel">${t("p_voice_pick")}</label>
+            <select id="vsel" class="vl">${list.map((v, i) => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === cur ? "selected" : ""}>${esc(v.name)} (${esc(v.lang)})${i === 0 ? " ★" : ""}</option>`).join("")}</select>
+            <div class="row-btns"><button data-vtry>${ICON.ear} ${t("p_try")}</button></div>`; })()}
+          <fieldset class="segs"><legend>${t("p_speed")}</legend>${["slow", "normal", "quick"].map((k) => `<label class="seg ${(st.speed || "normal") === k ? "on" : ""}"><input type="radio" name="speed" value="${k}" ${(st.speed || "normal") === k ? "checked" : ""}>${t("sp_" + k)}</label>`).join("")}</fieldset>
+          <p class="small">${t(/iPad|iPhone|Macintosh/.test(navigator.userAgent) && "ontouchend" in document ? "p_voice_tip_ios" : "p_voice_tip_android")}</p>
+          <p class="small">${t("p_voice_tip_own")}</p>
+        </section>
+
         <section class="card"><h2>${t("p_sfx_h")}</h2>
           <label class="skill"><input type="checkbox" data-sfx ${st.sfx !== false ? "checked" : ""}> ${t("p_sfx")}</label>
           <label class="skill"><input type="checkbox" data-calm ${st.calm ? "checked" : ""}> ${t("p_calm")}</label>
@@ -1577,6 +1607,11 @@
     };
     vl.onchange = vrows; vrows();
     app.querySelectorAll("[data-certprev]").forEach((b) => b.onclick = () => renderCertificate(Number(b.dataset.certprev)));
+    const vsel = app.querySelector("#vsel");
+    const tryVoice = () => speak("Hello! I'm Fox. Let's learn English! Can you say hello?");
+    if (vsel) vsel.onchange = () => { st.voice = vsel.value; save(); pickVoice(); tryVoice(); };
+    const vt = app.querySelector("[data-vtry]"); if (vt) vt.onclick = tryVoice;
+    app.querySelectorAll('input[name="speed"]').forEach((r) => r.onchange = () => { st.speed = r.value; save(); renderParent(); tryVoice(); });
     app.querySelector("[data-sfx]").onchange = (e) => { st.sfx = e.target.checked; save(); if (st.sfx) chime(true); toast(t("t_saved")); };
     app.querySelector("[data-calm]").onchange = (e) => { st.calm = e.target.checked; save(); applyCalm(); toast(t("t_saved")); };
     app.querySelectorAll("[data-open]").forEach((c) => c.onchange = () => {
