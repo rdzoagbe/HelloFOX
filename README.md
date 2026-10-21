@@ -48,6 +48,13 @@ Parent-facing screens (landing page, setup, parent area, parent tips) switch bet
 - Security: Content-Security-Policy (only this site + the YouTube no-cookie player), YouTube player sandboxed so it cannot open YouTube or other pages, parent check for videos once a day.
 - Tip: lock the tablet on the app with Guided Access (iPad) or App pinning (Android).
 
+## Level 2 (weeks 5 to 8)
+
+After the 20 first lessons, Level 2 moves from repeating words to answering and talking. Each lesson:
+hello, new sentences (Listen and repeat), Listen & tap, a picture story (she turns the pages), "Fox asks" (she answers first, then Fox shows a good answer), "Talk with Fox" (a little scene where she picks what to say) and stars.
+Level 2 opens when Level 1 is finished, or earlier from the parent area. Every lesson ends with a short "English mission" for the parent, and the can-do checklist covers all 8 weeks.
+Content: `level2.js` (lessons), `missions.js` (missions), `art2.js` (drawings).
+
 ## Automatic checks
 
 Every update to `main` runs the checks in `tests/` on GitHub (tab **Actions**, workflow "Automatic checks").

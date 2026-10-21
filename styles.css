@@ -565,3 +565,80 @@ body.calm #app.talking .fox .m-talk { display: inline; }
 .video-end .row-btns .next-btn { flex: none; background: var(--leaf); color: #fff; box-shadow: 0 6px 0 #36A06F; }
 .art { display: inline-flex; align-items: center; justify-content: center; }
 .art svg { width: 100%; height: 100%; }
+
+/* ---------- Fluid lessons ---------- */
+/* She taps to continue: a big pulsing arrow inside the story page or question card */
+.page, .ask-card { position: relative; }
+.tap-next { position: absolute; right: 14px; bottom: 14px; width: 84px; height: 84px; border-radius: 50%; background: var(--sun); color: #fff;
+  box-shadow: 0 6px 0 var(--sun-dark); display: grid; place-items: center; animation: pulse 1.1s ease-in-out infinite; z-index: 2; }
+.tap-next svg { width: 44px; height: 44px; }
+.chat-start { display: flex; margin: 10px auto; }
+body.calm .tap-next { animation: none; }
+/* Old words that come back inside "Listen and repeat" */
+.old-row { display: flex; gap: 12px; margin-top: 14px; justify-content: center; flex-wrap: wrap; }
+.word-card.mini { min-height: 0; padding: 10px 18px 12px; font-size: 20px; flex-direction: row; gap: 10px; border-radius: 22px; background: #FFF4D9; border: 3px dashed #F2C66B; position: relative; display: inline-flex; align-items: center; }
+.word-card.mini .rem { position: absolute; top: -12px; left: 14px; background: #F4862C; color: #fff; font-size: 13px; font-weight: 800; padding: 2px 10px; border-radius: 999px; }
+.word-card.mini.active { border-color: var(--sky); }
+.word-card.mini.heard { border-style: solid; border-color: var(--leaf); }
+/* the same drawing several times ("three cats") */
+.art-n { display: inline-grid !important; gap: 2px; place-items: center; }
+.art-n svg { width: 100%; height: auto; }
+
+/* ---------- Levels on the home map ---------- */
+.levels { display: flex; gap: 10px; justify-content: center; margin: 4px 0 10px; }
+.lvl { background: var(--card); border: 3px solid var(--line); border-radius: 999px; padding: 8px 22px; font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 20px; display: inline-flex; align-items: center; gap: 6px; }
+.lvl.on { border-color: var(--sun); background: #FFF1D6; }
+.lvl.locked { color: var(--soft); }
+.lvl svg { width: 18px; height: 18px; }
+.island.locked, .lesson-tile.locked { filter: grayscale(.7); opacity: .6; }
+.map.lvl-2 { background: linear-gradient(180deg, #CFEFFF, #BFE6D8); }
+
+/* ---------- Story ---------- */
+.book { position: relative; min-height: 360px; display: grid; }
+.page { grid-area: 1 / 1; display: none; text-align: center; animation: pageIn .45s ease; }
+.page.shown { display: block; }
+@keyframes pageIn { from { opacity: 0; transform: translateX(40px) rotate(1deg); } to { opacity: 1; transform: none; } }
+.page-pics { display: flex; justify-content: center; align-items: center; gap: 18px; background: #FFF4D9; border-radius: 28px; padding: 18px; margin: 4px auto 12px; max-width: 560px; }
+.page-text { font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 34px; margin: 6px 0; line-height: 1.25; }
+.page-text.q { color: var(--berry); }
+.q-cards { max-width: 700px; margin: 6px auto 0; }
+.word-card.hint { border-color: var(--sun); box-shadow: 0 0 0 6px rgba(255,181,71,.45); }
+.page-dots { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+.page-dots span { width: 34px; height: 34px; border-radius: 50%; background: var(--line); display: grid; place-items: center; font-weight: 900; color: var(--soft); cursor: pointer; }
+.page-dots span.on { background: var(--sun); color: #fff; }
+
+/* ---------- Fox asks ---------- */
+.ask-wrap { display: flex; gap: 24px; align-items: center; justify-content: center; }
+.side-fox.small { flex: 0 0 200px; text-align: center; }
+.ask-cards { flex: 1; max-width: 560px; display: grid; }
+.ask-card { grid-area: 1 / 1; display: none; background: #fff; border-radius: 32px; box-shadow: 0 6px 0 #F0E2CC; padding: 18px; text-align: center; cursor: pointer; }
+.ask-card.active { display: block; animation: pageIn .4s ease; }
+.ask-q { font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 32px; margin: 8px 0 0; }
+.ask-a { font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 30px; margin: 6px 0 0; color: #2E8A52; }
+.progress-stars span { font-size: 28px; }
+
+/* ---------- Talk with Fox ---------- */
+.chat-wrap { max-width: 720px; margin: 0 auto; }
+.chat-scene { text-align: center; }
+.chat-log { display: flex; flex-direction: column; gap: 10px; min-height: 200px; margin: 8px 0; }
+.msg { display: flex; align-items: center; gap: 10px; animation: pageIn .35s ease; }
+.msg .txt { font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 26px; padding: 12px 20px; border-radius: 24px; max-width: 80%; }
+.msg.fox .txt { background: #FFF1D6; border-bottom-left-radius: 6px; }
+.msg.me { justify-content: flex-end; }
+.msg.me .txt { background: #E3F2FF; border-bottom-right-radius: 6px; }
+.msg .avatar { width: 44px; height: 44px; font-size: 20px; flex: none; }
+.who-fox { flex: none; display: inline-flex; }
+.chat-choices { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.word-card.choice { min-width: 160px; }
+.word-card.choice:disabled:not(.right) { opacity: .35; }
+
+/* ---------- Parent mission ---------- */
+.mission { display: flex; flex-direction: column; gap: 4px; background: #EEF8F1; border: 2px solid #BFE6CC; border-radius: 18px; padding: 12px 16px; margin: 14px auto 0; max-width: 620px; text-align: left; font-size: 17px; }
+.mission b { display: inline-flex; align-items: center; gap: 6px; color: #2E8A52; }
+.mission svg { width: 18px; height: 18px; }
+.mission.small-m { margin: 12px 0 0; font-size: 15px; }
+
+@media (max-width: 820px) {
+  .ask-wrap { flex-direction: column; } .side-fox.small { flex: none; }
+  .page-text { font-size: 26px; } .msg .txt { font-size: 21px; }
+}

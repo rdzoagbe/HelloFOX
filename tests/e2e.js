@@ -122,10 +122,11 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(lessonsOk === 20, `every lesson reaches its speaking part (${lessonsOk}/20)`);
     const s2 = await store(p);
     check(Object.values(s2.profiles[0].data.lessons).filter((l) => l.status === "done").length === 20, "all 20 lessons are saved as done");
-    check(!!(await p.$("[data-cert]")), "the certificate unlocks at the end");
-    await p.click("[data-cert]"); await p.waitForTimeout(500);
+    check(!!(await p.$(".cert")), "finishing Level 1 opens the certificate by itself");
     check((await p.textContent(".cert h1")).includes("Keren"), "the certificate shows the child's name");
-    await p.click("[data-home]");
+    await p.click("[data-home]"); await p.waitForTimeout(300);
+    check(!!(await p.$("[data-cert]")), "the certificate stays on the home screen");
+    check(/Level 2/.test(await p.textContent(".s-sub")), "after Level 1, today's lesson is in Level 2");
     await p.click("[data-parent]");
     const [a, bb] = (await p.textContent(".gate p")).match(/\d+/g).map(Number);
     await p.click(`.gate [data-v="${a + bb}"]`);
@@ -164,6 +165,84 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(/^Lesson 2! /.test(open.said[0] || ""), "opening a lesson, Fox announces it (\"" + (open.said[0] || "nothing") + "\")");
     check(open.turns === 0, "the lesson opening never waits for her to repeat");
     check(!open.said.some((t) => ["Hello!", "Goodbye!", "Yes!", "No!"].includes(t)), "the opening does not replay the previous lesson's words");
+    await p.context().close();
+
+
+    // ---------- 2d. Level 2: locked at first, every lesson opens, one lesson played with taps only ----------
+    console.log("Level 2");
+    p = await newPage("level2-lock", {}, seeded({ code: "1234" }));
+    await p.click('[data-level="2"]'); await p.waitForTimeout(200);
+    check(!!(await p.$(".lvl.locked")) && !!(await p.$(".lesson-tile.locked")), "Level 2 is locked until Level 1 is finished");
+    await p.click('[data-lesson="w5d1"]'); await p.waitForTimeout(200);
+    check(!(await p.$(".stage")), "a locked lesson does not start");
+    await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(200);
+    await p.click('[data-open="2"]'); await p.click("[data-home]"); await p.click('[data-level="2"]'); await p.waitForTimeout(200);
+    check(!(await p.$(".lesson-tile.locked")), "a parent can open Level 2 early");
+    await p.context().close();
+
+    const l1done = {};
+    for (let w = 1; w <= 4; w++) for (let d = 1; d <= 5; d++) l1done[`w${w}d${d}`] = { status: "done", completedAt: "2026-10-01T10:00:00Z" };
+    const seededL2 = { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 60, lessons: l1done } }] };
+
+    // every Level 2 lesson: each of the 7 steps shows its activity
+    p = await newPage("level2-all", { viewport: { width: 1024, height: 768 } }, seededL2);
+    await p.evaluate(() => { speechSynthesis.speak = (u) => setTimeout(() => u.onend && u.onend(), 60); });
+    let l2ok = 0; const l2bad = [];
+    for (let w = 5; w <= 8; w++) for (let d = 1; d <= 5; d++) {
+      const id = `w${w}d${d}`;
+      await p.click('[data-level="2"]').catch(() => {}); await p.click(`[data-week="${w}"]`); await p.click(`[data-lesson="${id}"]`); await p.waitForTimeout(200);
+      const seen = [];
+      seen.push(!!(await p.$(".hello-fox")));
+      await forceNext(p); await p.waitForTimeout(200); seen.push((await p.$$(".learn .word-card")).length >= 4);
+      await forceNext(p); await p.waitForTimeout(300); seen.push(!!(await p.$("[data-q]")));
+      await forceNext(p); await p.waitForTimeout(1200); seen.push(!!(await p.$(".page.shown")));
+      await forceNext(p); await p.waitForTimeout(1200); seen.push(!!(await p.$(".ask-card.active")));
+      await forceNext(p); await p.waitForTimeout(300); seen.push(!!(await p.$("[data-start-chat]")));
+      await p.click("[data-start-chat]", { force: true }); await p.waitForTimeout(800); seen.push(!!(await p.$(".msg.fox")));
+      await forceNext(p); await p.waitForTimeout(300); seen.push(!!(await p.$(".mission")));
+      await p.click("[data-next]"); await p.waitForTimeout(400);
+      if (await p.$("[data-ok]")) { await p.click("[data-ok]"); await p.click("[data-home]"); }
+      if (await p.$(".cert")) await p.click("[data-home]");
+      if (seen.every(Boolean)) l2ok++; else l2bad.push(id + ":" + seen.map((x) => (x ? 1 : 0)).join(""));
+    }
+    check(l2ok === 20, `every Level 2 lesson shows words, tap game, story, questions, conversation and mission (${l2ok}/20)` + (l2bad.length ? " " + l2bad.join(" ") : ""));
+    const s3 = await store(p);
+    check(Object.keys(s3.profiles[0].data.lessons).filter((k) => /^w[5-8]/.test(k)).length === 20, "all 20 Level 2 lessons are saved as done");
+    check(!!(await p.$("[data-cert]")), "Level 2 has its certificate too");
+    await p.context().close();
+
+    // one Level 2 lesson played the way a child does it: only taps on pictures and arrows
+    p = await newPage("level2-taps", {}, seededL2);
+    await p.evaluate(() => { window.__said = []; speechSynthesis.speak = (u) => { window.__said.push(u.text); setTimeout(() => u.onend && u.onend(), 80); }; });
+    await p.click('[data-lesson="w5d2"]');
+    const t0 = Date.now(); let reached = false, movedAlone = false;
+    while (Date.now() - t0 < 300000) {
+      await p.waitForTimeout(400);
+      const h = ((await p.textContent(".stage h2").catch(() => "")) || "").trim();
+      if (await p.$(".score")) { reached = true; break; }
+      const tn = await p.$(".tap-next"); if (tn) { await tn.click({ force: true }); continue; }
+      const sc = await p.$("[data-start-chat]"); if (sc) { await sc.click({ force: true }); continue; }
+      const ch = await p.$(".choice:not([disabled])"); if (ch) { await ch.click({ force: true }); continue; }
+      const q = await p.$$(".page-q.shown [data-opt]");
+      if (q.length && !(await p.$(".page-q .right"))) { for (const x of q) { await x.click(); await p.waitForTimeout(200); if (await p.$(".page-q .right")) break; } continue; }
+      if ((await p.$("[data-q]")) && !(await p.$(".word-card.right"))) {
+        const said = (await p.evaluate(() => window.__said.slice(-1)[0])) || "";
+        for (const x of await p.$$(".cards .word-card")) { const tx = (await x.textContent()).trim().replace(/[.!?]/g, "").toLowerCase(); if (said.replace(/[.!?]/g, "").toLowerCase().includes(tx)) { await x.click(); break; } }
+        continue;
+      }
+      const endShown = !!(await p.$(".endbar:not([hidden])"));
+      if (endShown && (await p.$("[data-next]:not([disabled])"))) {
+        // waits for her: nothing changes by itself, even after 9 seconds
+        await p.waitForTimeout(9000);
+        const after = ((await p.textContent(".stage h2").catch(() => "")) || "").trim();
+        if (after !== h) movedAlone = true;
+        await p.click("[data-next]", { force: true });
+      }
+    }
+    const said2 = await p.evaluate(() => window.__said);
+    check(/^Level 2, lesson 2! /.test(said2[0] || ""), "a Level 2 lesson opens with \"Level 2, lesson 2!\"");
+    check(reached, "a whole Level 2 lesson can be played with taps only");
+    check(!movedAlone, "Fox waits for her tap before the next activity (no automatic Next)");
     await p.context().close();
 
     // ---------- 3. Video end screen, smart review, sound settings, languages ----------

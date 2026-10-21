@@ -234,4 +234,6 @@
     "I like it": S(`${shadow(28)}${thumb(false)}${badgeHeart}`), "I don't like it": S(`${shadow(28)}${thumb(true)}<circle cx="96" cy="24" r="16" fill="#fff"/><path d="M88 28 q8 -8 16 0" fill="none" stroke="${C.grey}" stroke-width="4" stroke-linecap="round"/>`)
   });
   window.ART = art;
+  // Drawing kit, reused by art2.js (Level 2 pictures) so every picture has the same style
+  window.ART_KIT = { C, S, shadow, txt, heartPath, badgeHeart, face, person, kid, bubble, hand, palm, thumb, motion, fig, cat, dog, bird, lion, apple, banana, car, frog, water };
 })();
