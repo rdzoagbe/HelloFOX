@@ -168,6 +168,37 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     await p.context().close();
 
 
+    // ---------- 2c-bis. a child who keeps tapping the pictures on the new-words screen is never stuck ----------
+    p = await newPage("learn-tapper", {}, seeded({}));
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    await p.click("[data-next]"); await p.waitForTimeout(300);
+    check(await p.$eval("[data-next]", (n) => n.disabled), "on the new-words screen, Next waits while Fox has not said the words yet");
+    for (let k = 0; k < 8; k++) { const cs = await p.$$(".learn .word-card:not(.mini)"); await cs[k % cs.length].click(); await p.waitForTimeout(250); }
+    check(!(await p.$eval("[data-next]", (n) => n.disabled)), "tapping every picture quickly still opens Next (tapping restarts Fox, so she used to stay stuck)");
+    await p.context().close();
+
+    // ---------- 2c-ter. tapping a grey Next shows what to do instead of doing nothing ----------
+    p = await newPage("grey-next", {}, seeded({}));
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    await p.click("[data-next]"); await p.waitForTimeout(300);
+    await p.evaluate(() => {
+      window.__hint = [];
+      Object.defineProperty(speechSynthesis, "speaking", { get: () => false, configurable: true }); // Fox is quiet
+      speechSynthesis.speak = (u) => window.__hint.push(u.text);
+    });
+    await p.click("[data-nextwrap]"); await p.waitForTimeout(100);
+    check(await p.$eval("[data-next]", (n) => n.disabled && n.classList.contains("nope")), "tapping a grey Next makes it shake, and it stays grey");
+    check(!!(await p.$(".look")), "tapping a grey Next makes the thing to do now wiggle");
+    check((await p.evaluate(() => window.__hint)).includes("Listen to Fox, and repeat!"), "tapping a grey Next makes Fox say what to do when she is quiet");
+    check(!!(await p.$(".learn")), "tapping a grey Next does not move on");
+    await p.context().close();
+
+    // ---------- 2c-quater. the big Start button is fully on screen on a landscape tablet ----------
+    p = await newPage("start-visible", { viewport: { width: 1024, height: 768 } }, seeded({}));
+    const sb = await p.$eval("[data-start]", (e) => e.getBoundingClientRect().bottom);
+    check(sb <= 768, `the Start button is fully visible on a 1024x768 landscape tablet (bottom ${Math.round(sb)}px)`);
+    await p.context().close();
+
     // ---------- 2d. Level 2: locked at first, every lesson opens, one lesson played with taps only ----------
     console.log("Level 2");
     p = await newPage("level2-lock", {}, seeded({ code: "1234" }));
@@ -175,6 +206,9 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(!!(await p.$(".lvl.locked")) && !!(await p.$(".lesson-tile.locked")), "Level 2 is locked until Level 1 is finished");
     await p.click('[data-lesson="w5d1"]'); await p.waitForTimeout(200);
     check(!(await p.$(".stage")), "a locked lesson does not start");
+    check(/Finish Level 1 first/.test(await p.textContent(".lock-box").catch(() => "")) && /20 lessons left/.test(await p.textContent(".lock-box").catch(() => "")),
+      "a locked level shows why it is locked and how many lessons are left");
+    check(await p.$eval(".lock-box", (e) => e.classList.contains("nudge")).catch(() => false), "tapping a locked lesson makes the message wiggle (seen with sound off)");
     await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(200);
     await p.click('[data-open="2"]'); await p.click("[data-home]"); await p.click('[data-level="2"]'); await p.waitForTimeout(200);
     check(!(await p.$(".lesson-tile.locked")), "a parent can open Level 2 early");
@@ -183,6 +217,16 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     const l1done = {};
     for (let w = 1; w <= 4; w++) for (let d = 1; d <= 5; d++) l1done[`w${w}d${d}`] = { status: "done", completedAt: "2026-10-01T10:00:00Z" };
     const seededL2 = { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 60, lessons: l1done } }] };
+
+    // one skipped Level 1 lesson keeps Level 2 closed: the home screen names it and one tap starts it
+    const oneMissing = { ...l1done }; delete oneMissing.w2d3;
+    p = await newPage("level2-one-missing", {}, { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 57, lessons: oneMissing } }] });
+    await p.click('[data-level="2"]'); await p.waitForTimeout(200);
+    const lockTxt = await p.textContent(".lock-box").catch(() => "");
+    check(/1 lesson left/.test(lockTxt) && /Week 2 · Colors around us/.test(lockTxt), "the locked Level 2 names the one skipped Level 1 lesson");
+    await p.click('[data-gotodo="w2d3"]'); await p.waitForTimeout(300);
+    check(!!(await p.$(".stage")), "tapping the skipped lesson in the message starts it");
+    await p.context().close();
 
     // every Level 2 lesson: each of the 7 steps shows its activity
     p = await newPage("level2-all", { viewport: { width: 1024, height: 768 } }, seededL2);

@@ -594,6 +594,15 @@
     const g = ISLANDS[Math.max(0, weeks.indexOf(weeks.includes(curWeek) ? curWeek : week))];
     const tiles = LESSONS.filter((l) => l.week === week).map((l) => `<button class="lesson-tile ${locked ? "locked" : ""} ${isDone(l.id) ? "done" : ""} ${next && next.id === l.id && !isDone(l.id) ? "next" : ""}" data-lesson="${l.id}">
       <span class="e">${l.emoji}</span><span class="t-day">${esc(l.day.slice(0, 3))}</span><span class="t-title">${esc(l.title)}</span></button>`).join("");
+    // A locked level says why, and which earlier lessons are still missing (a skipped lesson keeps the next level closed).
+    const todo = locked ? LESSONS.filter((l) => l.ready && levelOf(l) === level - 1 && !isDone(l.id)) : [];
+    const lockBox = locked ? `<section class="lock-box" role="status">
+        <span class="lock-ic">${ICON.lock}</span>
+        <div class="lock-txt"><b>Finish Level ${level - 1} first!</b>
+          <span>${todo.length === 1 ? "1 lesson left:" : todo.length + " lessons left" + (todo.length <= 4 ? ":" : ".")}</span>
+          ${todo.length <= 4 ? `<span class="lock-todo">${todo.map((l) => `<button class="lock-go" data-gotodo="${l.id}">${l.emoji} Week ${l.week} · ${esc(l.title)}</button>`).join("")}</span>`
+            : `<span class="lock-todo"><button class="lock-go" data-gotodo="${todo[0].id}">${todo[0].emoji} Week ${todo[0].week} · ${esc(todo[0].title)} ▶</button></span>`}
+          <small>${t("lock_parent", { n: level })}</small></div></section>` : "";
     const p = profile();
     app.innerHTML = `
       <header class="home-top">
@@ -606,6 +615,7 @@
         </div>
       </header>
       ${LEVELS.length > 1 ? `<nav class="levels" aria-label="Levels">${LEVELS.map((n) => `<button class="lvl ${n === level ? "on" : ""} ${levelOpen(n) ? "" : "locked"}" data-level="${n}">${levelOpen(n) ? "" : ICON.lock}Level ${n}${levelDone(n) ? " ⭐" : ""}</button>`).join("")}</nav>` : ""}
+      ${lockBox}
       <section class="map lvl-${level}" aria-label="Map">
         <svg class="map-path" viewBox="0 0 1116 520" preserveAspectRatio="none" aria-hidden="true">
           <path d="M180 380 C 250 250 300 190 440 175 C 570 160 600 330 735 360 C 860 390 900 210 995 170" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 22"/>
@@ -632,8 +642,15 @@
     app.querySelector("[data-parent]").onclick = () => parentGate(renderParent);
     app.querySelector("[data-who]").onclick = () => root.profiles.length > 1 ? renderWho() : speak(`Hello, ${childName()}!`);
     app.querySelectorAll("[data-week]").forEach((b) => b.onclick = () => { homeWeek = Number(b.dataset.week); renderHome(); speak("Week " + b.dataset.week + "!"); });
-    app.querySelectorAll("[data-lesson]").forEach((b) => b.onclick = () => locked
-      ? speak("Finish level " + (level - 1) + " first!") : tryStart(b.dataset.lesson));
+    // Tapping a locked lesson: Fox says why, and the message box wiggles so it is seen even with the sound off.
+    const nudge = () => {
+      speak("Finish level " + (level - 1) + " first!");
+      const box = app.querySelector(".lock-box"); if (!box) return;
+      box.classList.remove("nudge"); void box.offsetWidth; box.classList.add("nudge");
+      if (box.scrollIntoView) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    app.querySelectorAll("[data-lesson]").forEach((b) => b.onclick = () => locked ? nudge() : tryStart(b.dataset.lesson));
+    app.querySelectorAll("[data-gotodo]").forEach((b) => b.onclick = () => { homeLevel = null; homeWeek = null; tryStart(b.dataset.gotodo); });
   }
 
   // Who's playing? (only when there are several children)
@@ -733,7 +750,7 @@
         <button class="tips-btn" data-tips aria-expanded="false">${ICON.tips}<span>${t("tips")}</span></button>
         <div class="nav-right">
           ${step > 0 ? `<button class="back-btn" data-back aria-label="Back">◀</button>` : ""}
-          <button class="next-btn" data-next ${canNext ? "" : "disabled"}>${nextLabel || "Next ▶"}</button>
+          <span class="next-wrap" data-nextwrap><button class="next-btn" data-next ${canNext ? "" : "disabled"}>${nextLabel || "Next ▶"}</button></span>
         </div>
       </div>`;
     app.querySelector("[data-home]").onclick = renderHome;
@@ -748,6 +765,19 @@
     };
     const back = app.querySelector("[data-back]"); if (back) back.onclick = () => { step--; renderStep(); };
     app.querySelector("[data-next]").onclick = () => { if (step < steps.length - 1) { step++; renderStep(); } else finishLesson(); };
+    // A grey Next ignores taps (CSS lets them fall through to this wrapper): show her what to do instead of nothing.
+    app.querySelector("[data-nextwrap]").onclick = (e) => { const n = app.querySelector("[data-next]"); if (n && n.disabled) nextHint(n); };
+  }
+  // Tapped a grey Next: the button shakes, the thing to do now wiggles, and Fox says what to do (only if she is quiet,
+  // so the hint never cuts off a word Fox is teaching).
+  function nextHint(n) {
+    n.classList.remove("nope"); void n.offsetWidth; n.classList.add("nope");
+    const target = app.querySelector(".active") || app.querySelector(".word-card:not(.said), .choice:not([disabled]), .listen-btn");
+    if (target) { target.classList.remove("look"); void target.offsetWidth; target.classList.add("look"); }
+    const busy = (hasTTS && speechSynthesis.speaking) || !!nowAudio;
+    if (busy) return;
+    const kind = stepsOf(L)[step];
+    speak(kind === "learn" ? "Listen to Fox, and repeat!" : (kind === "play" || kind === "tap") ? "Listen, and tap the right picture!" : "Listen to Fox first!");
   }
   const enableNext = () => { const n = app.querySelector("[data-next]"); if (n && n.disabled) { n.disabled = false; n.classList.add("pulse"); } };
   const minutes = () => "";
@@ -796,6 +826,7 @@
     const bub = app.querySelector(".bubble"); if (bub) bub.textContent = fill(say).split(/(?<=[.!?])\s/)[0];
     // silent: she has just heard this exact line, so Fox does not repeat it before her turn
     (silent ? (f) => later(300, f) : (f) => sayThen(say, f))(() => {
+      el.classList.add("said"); // Fox has said this word once: it counts as heard, even if she taps on before her turn ends
       if (!childTurn) { status(""); const it = current && current.items[current.idx]; later((it && it.gap) || 900, cb); return; }
       if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
       status(act ? "act" : "turn");
@@ -961,10 +992,16 @@
     const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word, ck: wk(L, i) }))
       .concat(old.map((x, i) => ({ el: olds[i], say: x.c.say, key: x.c.key || x.c.word, ck: x.k, review: true })));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
-    els.forEach((b, i) => b.onclick = () => go(i));
+    els.forEach((b, i) => b.onclick = () => { b.classList.add("said"); go(i); }); // tapping a picture counts as meeting that word
     olds.forEach((b, i) => b.onclick = () => go(els.length + i));
     app.querySelector("[data-fox]").onclick = () => go(current ? current.idx : 0);
     app.querySelector("[data-again]").onclick = () => { els.concat(olds).forEach((e) => e.classList.remove("heard")); go(0); };
+    // Next opens once Fox has said every new word, however she got there: tapping a card restarts Fox from that card,
+    // so a child who taps around would otherwise never reach the end of the guided sequence and stay stuck.
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => { if (!els[0].isConnected) return mo.disconnect(); if (els.every((e) => e.classList.contains("said"))) { mo.disconnect(); enableNext(); } });
+      els.forEach((e) => mo.observe(e, { attributes: true, attributeFilter: ["class"] }));
+    }
     sayThen("Listen, and repeat!", () => go(0));
   }
 
