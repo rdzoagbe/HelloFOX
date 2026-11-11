@@ -591,6 +591,15 @@ body.calm .tap-next { animation: none; }
 .lvl.locked { color: var(--soft); }
 .lvl svg { width: 18px; height: 18px; }
 .island.locked, .lesson-tile.locked { filter: grayscale(.7); opacity: .6; }
+.lock-box { display: flex; gap: 12px; align-items: flex-start; background: #FFF1D6; border: 3px solid var(--sun); border-radius: 22px; padding: 12px 16px; margin: 0 0 12px; }
+.lock-ic svg { width: 32px; height: 32px; }
+.lock-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lock-txt b { font-family: Fredoka, Nunito, sans-serif; font-size: 22px; }
+.lock-todo { display: flex; flex-wrap: wrap; gap: 8px; }
+.lock-go { background: #fff; border: 3px solid var(--sun); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 17px; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+.lock-box.nudge { animation: lockNudge .5s ease; }
+@keyframes lockNudge { 0%, 100% { transform: none; } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+body.calm .lock-box.nudge { animation: none; }
 .map.lvl-2 { background: linear-gradient(180deg, #CFEFFF, #BFE6D8); }
 
 /* ---------- Story ---------- */

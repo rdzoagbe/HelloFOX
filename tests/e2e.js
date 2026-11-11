@@ -175,6 +175,9 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(!!(await p.$(".lvl.locked")) && !!(await p.$(".lesson-tile.locked")), "Level 2 is locked until Level 1 is finished");
     await p.click('[data-lesson="w5d1"]'); await p.waitForTimeout(200);
     check(!(await p.$(".stage")), "a locked lesson does not start");
+    check(/Finish Level 1 first/.test(await p.textContent(".lock-box").catch(() => "")) && /20 lessons left/.test(await p.textContent(".lock-box").catch(() => "")),
+      "a locked level shows why it is locked and how many lessons are left");
+    check(await p.$eval(".lock-box", (e) => e.classList.contains("nudge")).catch(() => false), "tapping a locked lesson makes the message wiggle (seen with sound off)");
     await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(200);
     await p.click('[data-open="2"]'); await p.click("[data-home]"); await p.click('[data-level="2"]'); await p.waitForTimeout(200);
     check(!(await p.$(".lesson-tile.locked")), "a parent can open Level 2 early");
@@ -183,6 +186,16 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     const l1done = {};
     for (let w = 1; w <= 4; w++) for (let d = 1; d <= 5; d++) l1done[`w${w}d${d}`] = { status: "done", completedAt: "2026-10-01T10:00:00Z" };
     const seededL2 = { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 60, lessons: l1done } }] };
+
+    // one skipped Level 1 lesson keeps Level 2 closed: the home screen names it and one tap starts it
+    const oneMissing = { ...l1done }; delete oneMissing.w2d3;
+    p = await newPage("level2-one-missing", {}, { ...seeded({}), profiles: [{ id: "k", color: "#7C6CF2", data: { name: "Keren", stars: 57, lessons: oneMissing } }] });
+    await p.click('[data-level="2"]'); await p.waitForTimeout(200);
+    const lockTxt = await p.textContent(".lock-box").catch(() => "");
+    check(/1 lesson left/.test(lockTxt) && /Week 2 · Colors around us/.test(lockTxt), "the locked Level 2 names the one skipped Level 1 lesson");
+    await p.click('[data-gotodo="w2d3"]'); await p.waitForTimeout(300);
+    check(!!(await p.$(".stage")), "tapping the skipped lesson in the message starts it");
+    await p.context().close();
 
     // every Level 2 lesson: each of the 7 steps shows its activity
     p = await newPage("level2-all", { viewport: { width: 1024, height: 768 } }, seededL2);

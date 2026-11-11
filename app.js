@@ -594,6 +594,15 @@
     const g = ISLANDS[Math.max(0, weeks.indexOf(weeks.includes(curWeek) ? curWeek : week))];
     const tiles = LESSONS.filter((l) => l.week === week).map((l) => `<button class="lesson-tile ${locked ? "locked" : ""} ${isDone(l.id) ? "done" : ""} ${next && next.id === l.id && !isDone(l.id) ? "next" : ""}" data-lesson="${l.id}">
       <span class="e">${l.emoji}</span><span class="t-day">${esc(l.day.slice(0, 3))}</span><span class="t-title">${esc(l.title)}</span></button>`).join("");
+    // A locked level says why, and which earlier lessons are still missing (a skipped lesson keeps the next level closed).
+    const todo = locked ? LESSONS.filter((l) => l.ready && levelOf(l) === level - 1 && !isDone(l.id)) : [];
+    const lockBox = locked ? `<section class="lock-box" role="status">
+        <span class="lock-ic">${ICON.lock}</span>
+        <div class="lock-txt"><b>Finish Level ${level - 1} first!</b>
+          <span>${todo.length === 1 ? "1 lesson left:" : todo.length + " lessons left" + (todo.length <= 4 ? ":" : ".")}</span>
+          ${todo.length <= 4 ? `<span class="lock-todo">${todo.map((l) => `<button class="lock-go" data-gotodo="${l.id}">${l.emoji} Week ${l.week} · ${esc(l.title)}</button>`).join("")}</span>`
+            : `<span class="lock-todo"><button class="lock-go" data-gotodo="${todo[0].id}">${todo[0].emoji} Week ${todo[0].week} · ${esc(todo[0].title)} ▶</button></span>`}
+          <small>${t("lock_parent", { n: level })}</small></div></section>` : "";
     const p = profile();
     app.innerHTML = `
       <header class="home-top">
@@ -606,6 +615,7 @@
         </div>
       </header>
       ${LEVELS.length > 1 ? `<nav class="levels" aria-label="Levels">${LEVELS.map((n) => `<button class="lvl ${n === level ? "on" : ""} ${levelOpen(n) ? "" : "locked"}" data-level="${n}">${levelOpen(n) ? "" : ICON.lock}Level ${n}${levelDone(n) ? " ⭐" : ""}</button>`).join("")}</nav>` : ""}
+      ${lockBox}
       <section class="map lvl-${level}" aria-label="Map">
         <svg class="map-path" viewBox="0 0 1116 520" preserveAspectRatio="none" aria-hidden="true">
           <path d="M180 380 C 250 250 300 190 440 175 C 570 160 600 330 735 360 C 860 390 900 210 995 170" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 22"/>
@@ -632,8 +642,15 @@
     app.querySelector("[data-parent]").onclick = () => parentGate(renderParent);
     app.querySelector("[data-who]").onclick = () => root.profiles.length > 1 ? renderWho() : speak(`Hello, ${childName()}!`);
     app.querySelectorAll("[data-week]").forEach((b) => b.onclick = () => { homeWeek = Number(b.dataset.week); renderHome(); speak("Week " + b.dataset.week + "!"); });
-    app.querySelectorAll("[data-lesson]").forEach((b) => b.onclick = () => locked
-      ? speak("Finish level " + (level - 1) + " first!") : tryStart(b.dataset.lesson));
+    // Tapping a locked lesson: Fox says why, and the message box wiggles so it is seen even with the sound off.
+    const nudge = () => {
+      speak("Finish level " + (level - 1) + " first!");
+      const box = app.querySelector(".lock-box"); if (!box) return;
+      box.classList.remove("nudge"); void box.offsetWidth; box.classList.add("nudge");
+      if (box.scrollIntoView) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    app.querySelectorAll("[data-lesson]").forEach((b) => b.onclick = () => locked ? nudge() : tryStart(b.dataset.lesson));
+    app.querySelectorAll("[data-gotodo]").forEach((b) => b.onclick = () => { homeLevel = null; homeWeek = null; tryStart(b.dataset.gotodo); });
   }
 
   // Who's playing? (only when there are several children)
