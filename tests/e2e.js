@@ -177,6 +177,28 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     check(!(await p.$eval("[data-next]", (n) => n.disabled)), "tapping every picture quickly still opens Next (tapping restarts Fox, so she used to stay stuck)");
     await p.context().close();
 
+    // ---------- 2c-ter. tapping a grey Next shows what to do instead of doing nothing ----------
+    p = await newPage("grey-next", {}, seeded({}));
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    await p.click("[data-next]"); await p.waitForTimeout(300);
+    await p.evaluate(() => {
+      window.__hint = [];
+      Object.defineProperty(speechSynthesis, "speaking", { get: () => false, configurable: true }); // Fox is quiet
+      speechSynthesis.speak = (u) => window.__hint.push(u.text);
+    });
+    await p.click("[data-nextwrap]"); await p.waitForTimeout(100);
+    check(await p.$eval("[data-next]", (n) => n.disabled && n.classList.contains("nope")), "tapping a grey Next makes it shake, and it stays grey");
+    check(!!(await p.$(".look")), "tapping a grey Next makes the thing to do now wiggle");
+    check((await p.evaluate(() => window.__hint)).includes("Listen to Fox, and repeat!"), "tapping a grey Next makes Fox say what to do when she is quiet");
+    check(!!(await p.$(".learn")), "tapping a grey Next does not move on");
+    await p.context().close();
+
+    // ---------- 2c-quater. the big Start button is fully on screen on a landscape tablet ----------
+    p = await newPage("start-visible", { viewport: { width: 1024, height: 768 } }, seeded({}));
+    const sb = await p.$eval("[data-start]", (e) => e.getBoundingClientRect().bottom);
+    check(sb <= 768, `the Start button is fully visible on a 1024x768 landscape tablet (bottom ${Math.round(sb)}px)`);
+    await p.context().close();
+
     // ---------- 2d. Level 2: locked at first, every lesson opens, one lesson played with taps only ----------
     console.log("Level 2");
     p = await newPage("level2-lock", {}, seeded({ code: "1234" }));

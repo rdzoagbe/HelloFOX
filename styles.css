@@ -111,7 +111,14 @@ button:focus-visible { outline: 4px solid var(--sky); outline-offset: 3px; }
   flex: 1; background: var(--leaf); color: #fff; border-radius: var(--radius);
   font-size: 30px; font-weight: 900; box-shadow: 0 7px 0 #36A06F; min-height: 88px;
 }
-.next-btn:disabled { background: var(--line); color: var(--soft); box-shadow: none; }
+.next-btn:disabled { background: var(--line); color: var(--soft); box-shadow: none; pointer-events: none; }
+/* the wrapper takes the place of the button in the row, so a tap on a grey Next lands on it (see nextHint in app.js) */
+.next-wrap { display: flex; flex: 0 1 360px; min-width: 0; }
+.next-wrap > .next-btn { flex: 1 1 auto; width: 100%; }
+.next-btn.nope { animation: nope .4s ease; }
+@keyframes nope { 0%, 100% { transform: none; } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+.look { animation: look .7s ease; }
+@keyframes look { 0%, 100% { transform: none; } 30% { transform: scale(1.08) rotate(-2deg); } 60% { transform: scale(1.08) rotate(2deg); } }
 .back-btn { background: var(--card); border-radius: var(--radius); padding: 0 26px; font-size: 30px; box-shadow: var(--shadow); min-height: 88px; }
 
 .parent-note {
@@ -391,6 +398,7 @@ h1, h2, .brand, .word-card, .prompt, .big-start .s-main, .next-btn, .listen-btn,
 .nav { align-items: center; }
 .nav-right { display: flex; gap: 14px; flex: 1; justify-content: flex-end; }
 .nav-right .next-btn { flex: 0 1 360px; }
+.nav-right .next-wrap .next-btn { flex: 1 1 auto; }
 .tips-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 18px; border: 2px solid #E6D8BF; border-radius: 999px;
   background: transparent; font: 700 17px Nunito, sans-serif; color: var(--soft); }
 .tips-btn[aria-expanded="true"] { background: #FFF1D6; }
@@ -483,9 +491,13 @@ h1, h2, .brand, .word-card, .prompt, .big-start .s-main, .next-btn, .listen-btn,
   .cards-2 .word-card { min-height: 150px; } .cards-2 .word-card .e { font-size: 64px; }
 }
 @media print { .tips-btn { display: none !important; } }
-/* Fit the whole home screen on a landscape tablet */
-.map { aspect-ratio: auto; height: clamp(300px, 52vh, 520px); }
+/* Fit the whole home screen on a landscape tablet: the map takes what is left once the header, the lesson tiles
+   and the Start button (about 450px together) have their room, so Start is never below the bottom edge. */
+.map { aspect-ratio: auto; height: clamp(240px, calc(100vh - 450px), 520px); height: clamp(240px, calc(100dvh - 450px), 520px); }
 @media (max-width: 700px) { .map { height: auto; } }
+/* Where it still cannot all fit (phones, small landscape screens), the Start button stays pinned to the bottom. */
+.start-row { position: sticky; bottom: 0; z-index: 5; padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, rgba(255, 248, 236, 0), var(--bg) 22%); }
 
 /* ---------- Landing page (parents, before installing) ---------- */
 .landing { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; padding-bottom: 30px; }

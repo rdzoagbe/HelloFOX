@@ -750,7 +750,7 @@
         <button class="tips-btn" data-tips aria-expanded="false">${ICON.tips}<span>${t("tips")}</span></button>
         <div class="nav-right">
           ${step > 0 ? `<button class="back-btn" data-back aria-label="Back">◀</button>` : ""}
-          <button class="next-btn" data-next ${canNext ? "" : "disabled"}>${nextLabel || "Next ▶"}</button>
+          <span class="next-wrap" data-nextwrap><button class="next-btn" data-next ${canNext ? "" : "disabled"}>${nextLabel || "Next ▶"}</button></span>
         </div>
       </div>`;
     app.querySelector("[data-home]").onclick = renderHome;
@@ -765,6 +765,19 @@
     };
     const back = app.querySelector("[data-back]"); if (back) back.onclick = () => { step--; renderStep(); };
     app.querySelector("[data-next]").onclick = () => { if (step < steps.length - 1) { step++; renderStep(); } else finishLesson(); };
+    // A grey Next ignores taps (CSS lets them fall through to this wrapper): show her what to do instead of nothing.
+    app.querySelector("[data-nextwrap]").onclick = (e) => { const n = app.querySelector("[data-next]"); if (n && n.disabled) nextHint(n); };
+  }
+  // Tapped a grey Next: the button shakes, the thing to do now wiggles, and Fox says what to do (only if she is quiet,
+  // so the hint never cuts off a word Fox is teaching).
+  function nextHint(n) {
+    n.classList.remove("nope"); void n.offsetWidth; n.classList.add("nope");
+    const target = app.querySelector(".active") || app.querySelector(".word-card:not(.said), .choice:not([disabled]), .listen-btn");
+    if (target) { target.classList.remove("look"); void target.offsetWidth; target.classList.add("look"); }
+    const busy = (hasTTS && speechSynthesis.speaking) || !!nowAudio;
+    if (busy) return;
+    const kind = stepsOf(L)[step];
+    speak(kind === "learn" ? "Listen to Fox, and repeat!" : (kind === "play" || kind === "tap") ? "Listen, and tap the right picture!" : "Listen to Fox first!");
   }
   const enableNext = () => { const n = app.querySelector("[data-next]"); if (n && n.disabled) { n.disabled = false; n.classList.add("pulse"); } };
   const minutes = () => "";
