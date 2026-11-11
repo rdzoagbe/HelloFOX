@@ -813,6 +813,7 @@
     const bub = app.querySelector(".bubble"); if (bub) bub.textContent = fill(say).split(/(?<=[.!?])\s/)[0];
     // silent: she has just heard this exact line, so Fox does not repeat it before her turn
     (silent ? (f) => later(300, f) : (f) => sayThen(say, f))(() => {
+      el.classList.add("said"); // Fox has said this word once: it counts as heard, even if she taps on before her turn ends
       if (!childTurn) { status(""); const it = current && current.items[current.idx]; later((it && it.gap) || 900, cb); return; }
       if (listenOn() && !act) { listenFor(el, key || say, say, 0, cb); return; }
       status(act ? "act" : "turn");
@@ -978,10 +979,16 @@
     const items = L.cards.map((c, i) => ({ el: els[i], say: c.say, key: c.key || c.word, ck: wk(L, i) }))
       .concat(old.map((x, i) => ({ el: olds[i], say: x.c.say, key: x.c.key || x.c.word, ck: x.k, review: true })));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(12); showEnd("Well done! Again, or next?"); }); };
-    els.forEach((b, i) => b.onclick = () => go(i));
+    els.forEach((b, i) => b.onclick = () => { b.classList.add("said"); go(i); }); // tapping a picture counts as meeting that word
     olds.forEach((b, i) => b.onclick = () => go(els.length + i));
     app.querySelector("[data-fox]").onclick = () => go(current ? current.idx : 0);
     app.querySelector("[data-again]").onclick = () => { els.concat(olds).forEach((e) => e.classList.remove("heard")); go(0); };
+    // Next opens once Fox has said every new word, however she got there: tapping a card restarts Fox from that card,
+    // so a child who taps around would otherwise never reach the end of the guided sequence and stay stuck.
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => { if (!els[0].isConnected) return mo.disconnect(); if (els.every((e) => e.classList.contains("said"))) { mo.disconnect(); enableNext(); } });
+      els.forEach((e) => mo.observe(e, { attributes: true, attributeFilter: ["class"] }));
+    }
     sayThen("Listen, and repeat!", () => go(0));
   }
 

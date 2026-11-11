@@ -168,6 +168,15 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     await p.context().close();
 
 
+    // ---------- 2c-bis. a child who keeps tapping the pictures on the new-words screen is never stuck ----------
+    p = await newPage("learn-tapper", {}, seeded({}));
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    await p.click("[data-next]"); await p.waitForTimeout(300);
+    check(await p.$eval("[data-next]", (n) => n.disabled), "on the new-words screen, Next waits while Fox has not said the words yet");
+    for (let k = 0; k < 8; k++) { const cs = await p.$$(".learn .word-card:not(.mini)"); await cs[k % cs.length].click(); await p.waitForTimeout(250); }
+    check(!(await p.$eval("[data-next]", (n) => n.disabled)), "tapping every picture quickly still opens Next (tapping restarts Fox, so she used to stay stuck)");
+    await p.context().close();
+
     // ---------- 2d. Level 2: locked at first, every lesson opens, one lesson played with taps only ----------
     console.log("Level 2");
     p = await newPage("level2-lock", {}, seeded({ code: "1234" }));
