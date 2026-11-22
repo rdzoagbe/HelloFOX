@@ -1,6 +1,6 @@
 // Offline support: caches the app shell. Bump VERSION whenever you change a file: the new version is fetched in the
 // background and used from the next launch (the app never waits on the network to open, even on a bad connection).
-const VERSION = "hellofox-v25";
+const VERSION = "hellofox-v26";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "lessons.js", "level2.js", "missions.js", "i18n.js", "art.js", "art2.js", "manifest.webmanifest",
   "fonts/fonts.css", "fonts/fredoka-latin-600-normal.woff2", "fonts/fredoka-latin-700-normal.woff2",
