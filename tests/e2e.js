@@ -14,8 +14,11 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/cs
 let failed = 0;
 const check = (ok, msg) => { console.log((ok ? "  ok   " : "  FAIL ") + msg); if (!ok) { failed++; if (process.env.GITHUB_ACTIONS) console.log("::error title=Check failed::" + String(msg).replace(/\n/g, " %0A")); } };
 
-// Tiny local web server for the app files
+// Tiny local web server for the app files. netDown = true drops every connection, like a tablet with no network:
+// the browser's own offline switch does not reach the service worker's requests, this does.
+let netDown = false;
 const server = http.createServer((req, res) => {
+  if (netDown) { req.socket.destroy(); return; }
   const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   let file = path.join(root, p === "/" ? "index.html" : p);
   if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
@@ -197,6 +200,74 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     p = await newPage("start-visible", { viewport: { width: 1024, height: 768 } }, seeded({}));
     const sb = await p.$eval("[data-start]", (e) => e.getBoundingClientRect().bottom);
     check(sb <= 768, `the Start button is fully visible on a 1024x768 landscape tablet (bottom ${Math.round(sb)}px)`);
+    await p.context().close();
+
+    // ---------- 2c-5. guessing the parent code: 3 wrong answers, then every wrong answer costs a 30 s wait ----------
+    p = await newPage("gate-wait", {}, seeded({ code: "1234" }));
+    await p.click("[data-parent]");
+    for (let k = 0; k < 3; k++) { for (const d of "0000") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(750); }
+    check(!(await p.$("[data-kid]")), "three wrong codes do not open the parent area");
+    check(await p.$eval(".keypad button", (b) => b.disabled) && /Wait \d+ s/.test(await p.textContent("[data-wait]")),
+      "after three wrong codes the keypad is off and a wait is shown");
+    await p.click("[data-cancel]"); await p.click("[data-parent]"); await p.waitForTimeout(300);
+    check(await p.$eval(".keypad button", (b) => b.disabled), "closing and reopening the gate does not skip the wait");
+    await p.evaluate(() => { const g = JSON.parse(localStorage.getItem("hellofox-gate")); g.until = Date.now() - 1; localStorage.setItem("hellofox-gate", JSON.stringify(g)); });
+    await p.waitForTimeout(400);
+    check(!(await p.$eval(".keypad button", (b) => b.disabled)), "when the wait is over the keypad works again");
+    for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(300);
+    check(!!(await p.$("[data-kid]")), "the right code still opens the parent area after a wait");
+    check((await p.evaluate(() => JSON.parse(localStorage.getItem("hellofox-gate")).n)) === 0, "a right code resets the wrong-answer count");
+    check(!(await p.$("[data-delcode]")), "the parent code can be changed but not removed");
+    await p.context().close();
+
+    // the fallback sum (old data without a code) gets the same wait
+    p = await newPage("sum-wait", {}, seeded({ code: "" }));
+    await p.click("[data-parent]"); await p.waitForTimeout(150);
+    for (let k = 0; k < 3; k++) { // a wrong sum reopens the gate with a new sum, so the padlock is tapped once only
+      const wrong = await p.$$eval(".gate-num", (bs) => { const q = document.querySelector(".gate-box p").textContent.match(/(\d+) \+ (\d+)/); const ans = Number(q[1]) + Number(q[2]); return bs.map((b) => b.dataset.v).filter((v) => Number(v) !== ans)[0]; });
+      await p.click(`.gate-num[data-v="${wrong}"]`); await p.waitForTimeout(200);
+    }
+    check(!!(await p.$(".gate")) && (await p.$eval(".gate-num", (b) => b.disabled)), "three wrong sums also start a wait");
+    await p.context().close();
+
+    // ---------- 2c-6. privacy: the text says what is stored, and "Delete everything" really deletes everything ----------
+    p = await newPage("privacy", {}, seeded({ code: "1234" }));
+    await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(300);
+    const priv = await p.textContent(".panel:last-of-type");
+    check(/record in your own voice/.test(priv) && /stay on this device/.test(priv), "the privacy text says the parent's voice recordings are stored on the device");
+    check(/Fox listens/.test(priv) && /YouTube/.test(priv), "the privacy text names the two features that reach outside the device");
+    await p.evaluate(() => new Promise((res) => { const r = indexedDB.open("hellofox", 1); r.onupgradeneeded = () => r.result.createObjectStore("voice");
+      r.onsuccess = () => { const tx = r.result.transaction("voice", "readwrite"); tx.objectStore("voice").put(new Blob(["x"]), "Hello!"); tx.oncomplete = res; }; }));
+    p.once("dialog", (d) => d.accept());
+    await p.click("[data-wipe]"); await p.waitForTimeout(1200);
+    const wiped = await p.evaluate(() => new Promise((res) => { // the app reopens its (now empty) recordings store on start
+      const out = { store: localStorage.getItem("hellofox-v2"), gate: localStorage.getItem("hellofox-gate"), recordings: 0 };
+      const r = indexedDB.open("hellofox", 1); r.onupgradeneeded = () => r.result.createObjectStore("voice");
+      r.onerror = () => res(out);
+      r.onsuccess = () => { const c = r.result.transaction("voice").objectStore("voice").count(); c.onsuccess = () => { out.recordings = c.result; res(out); }; c.onerror = () => res(out); };
+    }));
+    check(wiped.store === null && wiped.gate === null && wiped.recordings === 0, "Delete everything removes profiles, progress, the code, the gate counter and the voice recordings"
+      + (wiped.recordings ? ` (${wiped.recordings} recording(s) left)` : wiped.store !== null ? " (progress left)" : wiped.gate !== null ? " (gate counter left)" : ""));
+    check(!!(await p.$(".landing, .setup")), "after deleting everything the app starts over from the beginning");
+    await p.context().close();
+
+    // ---------- 2c-7. offline: the app opens from its saved copy without waiting on the network ----------
+    p = await newPage("offline", {}, seeded({ code: "1234" }));
+    await p.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+    await p.waitForTimeout(800);
+    const swOn = await p.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller));
+    if (swOn) {
+      netDown = true;
+      const t0 = Date.now();
+      await p.reload({ waitUntil: "load" }).catch(() => {});
+      await p.waitForTimeout(500);
+      const ms = Date.now() - t0;
+      check(!!(await p.$("[data-start]")), "with no network, the home screen still opens from the saved copy");
+      check(ms < 5000, `with no network, the app opens without waiting on it (${ms} ms)`);
+      const missing = await p.evaluate(() => fetch("no-such-file.png").then((r) => ({ ok: r.ok, html: r.headers.get("content-type") || "" })).catch(() => ({ ok: false, html: "" })));
+      check(!missing.ok && !/html/.test(missing.html), "with no network, a missing picture fails instead of being replaced by the web page");
+      netDown = false;
+    } else console.log("  skip offline checks: service worker not active in this browser context");
     await p.context().close();
 
     // ---------- 2d. Level 2: locked at first, every lesson opens, one lesson played with taps only ----------

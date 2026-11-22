@@ -1,5 +1,6 @@
 /* Hello Fox! — app logic, no frameworks, no tracking.
-   Progress is stored only on this device (localStorage). Voice recordings are never stored. */
+   Everything stays on this device: progress and child names in localStorage, the parent's own word recordings
+   (made in the parent area) in IndexedDB. The child's "hear yourself" mic clip lives in memory only. */
 (function () {
   "use strict";
 
@@ -341,6 +342,22 @@
   }
 
   // ---------- parent gate: the parent's 4-digit code; until one is set, a sum a 6-year-old can't do ----------
+  // Wrong answers are counted on this device (survives a reload). From the 3rd wrong answer on, every wrong answer
+  // means a 30 s wait: a child can no longer get in by trying codes, or sums, over and over.
+  const GATE_KEY = "hellofox-gate", GATE_TRIES = 3, GATE_WAIT_MS = 30000;
+  const gateState = () => { try { const g = JSON.parse(localStorage.getItem(GATE_KEY)); return g && typeof g === "object" ? { n: Number(g.n) || 0, until: Number(g.until) || 0 } : { n: 0, until: 0 }; } catch (e) { return { n: 0, until: 0 }; } };
+  const gateSave = (g) => { try { localStorage.setItem(GATE_KEY, JSON.stringify(g)); } catch (e) { } };
+  const gateWrong = () => { const g = gateState(); g.n++; if (g.n >= GATE_TRIES) g.until = Date.now() + GATE_WAIT_MS; gateSave(g); return g; };
+  const gateRight = () => gateSave({ n: 0, until: 0 });
+  // Shows the wait inside the gate box and keeps its buttons off until it is over. Returns true if a wait is running.
+  function gateWait(wrap) {
+    const left = () => Math.ceil((gateState().until - Date.now()) / 1000);
+    const msg = wrap.querySelector("[data-wait]"), btns = () => wrap.querySelectorAll("button:not([data-cancel])");
+    if (left() <= 0) { if (msg) msg.hidden = true; btns().forEach((b) => b.disabled = false); return false; }
+    btns().forEach((b) => b.disabled = true);
+    const tick = () => { if (!wrap.isConnected) return; const n = left(); if (n <= 0) { gateWait(wrap); return; } if (msg) { msg.hidden = false; msg.textContent = t("gate_wait", { s: n }); } setTimeout(tick, 250); };
+    tick(); return true;
+  }
   function parentGate(onPass) {
     const wrap = document.createElement("div");
     wrap.className = "gate";
@@ -351,18 +368,19 @@
         <div class="pin">${[0, 1, 2, 3].map((i) => `<span data-pin="${i}"></span>`).join("")}</div>
         <div class="keypad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map((k) => k === "" ? "<span></span>"
           : `<button data-k="${k}" aria-label="${k === "del" ? t("erase") : k}">${k === "del" ? "⌫" : k}</button>`).join("")}</div>
+        <p class="gate-wait" data-wait role="alert" hidden></p>
         <button data-cancel class="gate-cancel">${t("cancel")}</button></div>`;
       const pin = wrap.querySelector(".pin");
       const paint = () => wrap.querySelectorAll("[data-pin]").forEach((x, i) => x.classList.toggle("on", i < typed.length));
       wrap.addEventListener("click", (e) => {
-        const b = e.target.closest("button"); if (!b) return;
+        const b = e.target.closest("button"); if (!b || b.disabled) return;
         if (b.hasAttribute("data-cancel")) { wrap.remove(); return; }
         const k = b.dataset.k;
         typed = k === "del" ? typed.slice(0, -1) : (typed + k).slice(0, 4);
         paint();
         if (typed.length === 4) {
-          if (typed === code) { wrap.remove(); onPass(); }
-          else { pin.classList.add("wrong"); setTimeout(() => { typed = ""; paint(); pin.classList.remove("wrong"); }, 600); }
+          if (typed === code) { gateRight(); wrap.remove(); onPass(); }
+          else { gateWrong(); pin.classList.add("wrong"); setTimeout(() => { typed = ""; paint(); pin.classList.remove("wrong"); gateWait(wrap); }, 600); }
         }
       });
     } else {
@@ -371,14 +389,17 @@
       wrap.innerHTML = `<div class="gate-box"><h2>${t("parent_area")}</h2><p>${t("sum_q", { a, b })}</p>
         <div class="row-btns center">${opts.map((o) => `<button data-v="${o}" class="gate-num">${o}</button>`).join("")}</div>
         <p class="small">${t("gate_tip")}</p>
+        <p class="gate-wait" data-wait role="alert" hidden></p>
         <button data-cancel class="gate-cancel">${t("cancel")}</button></div>`;
       wrap.addEventListener("click", (e) => {
-        const btn = e.target.closest("button"); if (!btn) return;
-        wrap.remove();
-        if (!btn.hasAttribute("data-cancel") && Number(btn.dataset.v) === ans) onPass();
+        const btn = e.target.closest("button"); if (!btn || btn.disabled) return;
+        if (btn.hasAttribute("data-cancel")) { wrap.remove(); return; }
+        if (Number(btn.dataset.v) === ans) { gateRight(); wrap.remove(); onPass(); }
+        else { gateWrong(); wrap.remove(); parentGate(onPass); } // a new sum, and the wait if she has had her 3 tries
       });
     }
     document.body.appendChild(wrap);
+    gateWait(wrap);
   }
 
   // ---------- install as an app (Android Chrome gives us its real install dialog) ----------
@@ -1517,7 +1538,7 @@
           <div class="add-kid"><label for="pcode" class="sr">${t("p_new_code")}</label>
             <input id="pcode" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••">
             <button data-setcode>${st.code ? t("change") : t("create")}</button></div>
-          ${st.code ? `<button class="link" data-delcode>${t("p_del_code")}</button>` : ""}
+
         </section>
 
         <section class="card"><h2>${t("p_backup")}</h2>
@@ -1587,7 +1608,11 @@
         <p class="small">${t("p_res_note")}</p></section>
 
       <section class="panel"><h2>${t("privacy")}</h2>
-        <p class="small">${t("p_privacy_p")}</p></section>`;
+        <p class="small">${t("p_privacy_p")}</p>
+        <ul class="small stored"><li>${t("p_stored_1")}</li><li>${t("p_stored_2", { n: voices.size })}</li><li>${t("p_stored_3")}</li></ul>
+        <p class="small">${t("p_privacy_out")}</p>
+        <div class="row-btns"><button class="danger" data-wipe>${t("p_wipe")}</button></div>
+        <p class="small">${t("p_wipe_p")}</p></section>`;
 
     bindLang(renderParent);
     app.querySelector("[data-home]").onclick = renderHome;
@@ -1608,8 +1633,6 @@
       if (!/^\d{4}$/.test(v)) { toast(t("e_code4")); return; }
       st.code = v; save(); renderParent(); toast(t("t_code_saved"));
     };
-    const dc = app.querySelector("[data-delcode]");
-    if (dc) dc.onclick = () => { if (confirm(t("p_del_code_q"))) { st.code = ""; save(); renderParent(); } };
     // backup: export everything except voice recordings and the code; import replaces after a confirmation
     app.querySelector("[data-export]").onclick = () => {
       const copy = JSON.parse(JSON.stringify(root)); copy.settings.code = "";
@@ -1686,6 +1709,20 @@
         const n = state.name; profile().data = fresh(n); state = profile().data; save(); renderParent(); toast(t("t_erased"));
       }
     };
+    app.querySelector("[data-wipe]").onclick = async () => {
+      if (!confirm(t("p_wipe_q"))) return;
+      await wipeAll();
+      location.reload();
+    };
+  }
+  // Delete everything Hello Fox keeps on this device: profiles, progress, settings, the parent code, the parent's
+  // word recordings and the gate counter. The offline copy of the app itself holds no personal data and stays.
+  async function wipeAll() {
+    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(OLD_KEY); localStorage.removeItem(GATE_KEY); } catch (e) { }
+    try { sessionStorage.removeItem("hf-browser"); } catch (e) { }
+    voices.forEach((u) => URL.revokeObjectURL(u)); voices.clear();
+    if (window.indexedDB) await new Promise((res) => { const r = indexedDB.deleteDatabase("hellofox"); r.onsuccess = r.onerror = r.onblocked = () => res(); });
+    root = freshRoot(); state = profile().data;
   }
 
   // ---------- boot ----------
