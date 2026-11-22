@@ -1,6 +1,6 @@
 # Hello Fox! — beginner English PWA
 
-Hello Fox is an installable, tablet-friendly English-learning app for young French-speaking beginners. It contains **40 lessons across two levels**: Level 1 builds vocabulary and listening confidence; Level 2 adds picture stories, comprehension questions and guided conversations. The app includes a talking fox, guided turns, optional speech checks, learning games, stickers, parent voice recordings, progress tracking and printable certificates.
+Hello Fox is an installable, tablet-friendly English-learning app for young French-speaking beginners. It contains **40 lessons across two levels**: Level 1 builds vocabulary and listening confidence; Level 2 adds picture stories, comprehension questions and guided conversations. The app includes a talking fox, guided turns, a "hear it again" button on every lesson screen (no reading needed), optional speech checks, learning games, stickers, parent voice recordings, progress tracking and printable certificates.
 
 The app is built as static files: there is no build step, application server, user account or analytics service. Child profiles and progress are stored in the browser's local storage on the device.
 
@@ -47,6 +47,8 @@ Lesson content lives in `lessons.js` and `level2.js`. Supporting missions and il
 - Multiple child profiles, each with their own progress, stars and stickers.
 - A parent area protected by a locally stored 4-digit code, set during setup. The code can be changed but not removed.
 - Daily lesson limits, calm mode and sound settings.
+- A choice for the "Watch & sing" step: YouTube videos approved once a day (default), always allowed, or off, in which case Fox says the rhyme line by line with nothing to approve and no internet needed.
+- "Parent tips" on lesson screens open behind the parent gate (asked once per visit), so a child cannot open them by accident.
 - Backup export and import.
 - Parent voice recordings and settings for the optional “Fox listens” speech check.
 
@@ -54,7 +56,7 @@ Lesson content lives in `lessons.js` and `level2.js`. Supporting missions and il
 
 ## Automatic checks
 
-The **Automatic checks** workflow runs on pushes to `main`, pull requests and manual dispatch. It runs JavaScript syntax and lesson/content checks, verifies the offline shell file list, and exercises key journeys in automated Chromium.
+The **Automatic checks** workflow runs on pushes to `main`, pull requests and manual dispatch. It has two jobs: `test` runs JavaScript syntax and lesson/content checks, verifies the offline shell file list, and exercises key journeys in automated Chromium; `sweep` plays every lesson as a child who taps whatever looks tappable and fails if any screen keeps the Next button blocked (`npm run sweep`, about 10 minutes; `node tests/sweep.js w2d3` replays one lesson).
 
 To run the suite locally:
 

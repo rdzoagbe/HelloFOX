@@ -28,7 +28,7 @@
   function fresh(name) { return { name: name || "", stars: 0, lessons: {}, skills: {}, weak: {}, daily: { date: "", count: 0 } }; }
   function freshRoot() {
     const id = "p" + Date.now().toString(36);
-    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", setupDone: false, lang: "en", sfx: true, calm: false } };
+    return { profiles: [{ id, color: COLORS[0], data: fresh() }], active: id, settings: { listen: false, code: "", limit: 0, lastBackup: "", videoDay: "", video: "ask", setupDone: false, lang: "en", sfx: true, calm: false } };
   }
   const obj = (x) => (x && typeof x === "object" && !Array.isArray(x)) ? x : {};
   function cleanData(d) {
@@ -56,7 +56,8 @@
     return { profiles, active: profiles.some((p) => p.id === r.active) ? r.active : profiles[0].id,
       settings: { listen: !!st.listen, code: /^\d{4}$/.test(st.code || "") ? st.code : "",
         limit: [0, 1, 2].includes(Number(st.limit)) ? Number(st.limit) : 0,
-        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10), setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en", sfx: st.sfx !== false, calm: !!st.calm,
+        lastBackup: String(st.lastBackup || "").slice(0, 40), videoDay: String(st.videoDay || "").slice(0, 10),
+        video: ["ask", "always", "off"].includes(st.video) ? st.video : "ask", setupDone: !!st.setupDone, lang: st.lang === "fr" ? "fr" : "en", sfx: st.sfx !== false, calm: !!st.calm,
         open: Array.isArray(st.open) ? st.open.filter((n) => [2, 3].includes(n)) : [],
         voice: String(st.voice || "").slice(0, 200), speed: ["slow", "normal", "quick"].includes(st.speed) ? st.speed : "normal" } };
   }
@@ -358,7 +359,9 @@
     const tick = () => { if (!wrap.isConnected) return; const n = left(); if (n <= 0) { gateWait(wrap); return; } if (msg) { msg.hidden = false; msg.textContent = t("gate_wait", { s: n }); } setTimeout(tick, 250); };
     tick(); return true;
   }
+  let parentHere = false; // a parent passed the gate during this visit: parent tips open without asking again
   function parentGate(onPass) {
+    const pass = () => { parentHere = true; onPass(); };
     const wrap = document.createElement("div");
     wrap.className = "gate";
     const code = root.settings.code;
@@ -379,7 +382,7 @@
         typed = k === "del" ? typed.slice(0, -1) : (typed + k).slice(0, 4);
         paint();
         if (typed.length === 4) {
-          if (typed === code) { gateRight(); wrap.remove(); onPass(); }
+          if (typed === code) { gateRight(); wrap.remove(); pass(); }
           else { gateWrong(); pin.classList.add("wrong"); setTimeout(() => { typed = ""; paint(); pin.classList.remove("wrong"); gateWait(wrap); }, 600); }
         }
       });
@@ -394,7 +397,7 @@
       wrap.addEventListener("click", (e) => {
         const btn = e.target.closest("button"); if (!btn || btn.disabled) return;
         if (btn.hasAttribute("data-cancel")) { wrap.remove(); return; }
-        if (Number(btn.dataset.v) === ans) { gateRight(); wrap.remove(); onPass(); }
+        if (Number(btn.dataset.v) === ans) { gateRight(); wrap.remove(); pass(); }
         else { gateWrong(); wrap.remove(); parentGate(onPass); } // a new sum, and the wait if she has had her 3 tries
       });
     }
@@ -757,14 +760,28 @@
     renderStep();
   }
 
+  // "Hear it again": each screen can set what the ear button repeats (the current question, page or word);
+  // otherwise Fox repeats the screen's instruction. No reading needed to find out what to do.
+  let replayFn = null;
+  function stepHint() {
+    const kind = stepsOf(L)[step];
+    return { hello: L.warmup ? L.warmup.say : STEP_SAY[0], learn: "Listen, and repeat!", watch: STEP_SAY[2], play: STEP_SAY[3],
+      tap: "Listen, and tap the right picture!", story: "Tap to turn the pages!", ask: "Fox asks, you answer!",
+      chat: "Let's talk! Tap the button when you are ready!", stars: STEP_SAY[4] }[kind] || STEP_SAY[0];
+  }
+  function replay() { if (replayFn) replayFn(); else speak(stepHint()); }
   function frame(inner, canNext, nextLabel) {
     const steps = stepsOf(L);
     const bars = steps.map((_, i) => `<span class="${i < step ? "done" : i === step ? "on" : ""}"></span>`).join("");
+    replayFn = null;
     app.innerHTML = `
       <div class="topbar">
         <button class="icon-btn" data-home aria-label="Home">${ICON.home}</button>
         <div class="steps" aria-label="Step ${step + 1} of ${steps.length}">${bars}</div>
-        <button class="icon-btn pause-btn" data-pause aria-label="Pause">${ICON.pause}</button>
+        <div class="top-right-btns">
+          <button class="icon-btn replay-btn" data-replay aria-label="Hear it again">${ICON.ear}</button>
+          <button class="icon-btn pause-btn" data-pause aria-label="Pause">${ICON.pause}</button>
+        </div>
       </div>
       <section class="stage">${inner}</section>
       <div class="nav">
@@ -776,13 +793,20 @@
       </div>`;
     app.querySelector("[data-home]").onclick = renderHome;
     app.querySelector("[data-pause]").onclick = togglePause;
+    const rb = app.querySelector("[data-replay]");
+    rb.onclick = () => { rb.classList.remove("ping"); void rb.offsetWidth; rb.classList.add("ping"); replay(); };
+    // Parent tips are for the parent: behind the parent gate, once per visit.
     const tips = app.querySelector("[data-tips]");
     if (!app.querySelector(".parent-note")) tips.hidden = true;
-    tips.onclick = () => {
-      const open = tips.getAttribute("aria-expanded") !== "true";
+    const showTips = (open) => {
       tips.setAttribute("aria-expanded", String(open));
       app.querySelectorAll(".parent-note").forEach((n) => { n.hidden = !open; });
       if (open) { const n = app.querySelector(".parent-note"); if (n && n.scrollIntoView) n.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+    };
+    tips.onclick = () => {
+      const open = tips.getAttribute("aria-expanded") !== "true";
+      if (open && !parentHere) { parentGate(() => showTips(true)); return; }
+      showTips(open);
     };
     const back = app.querySelector("[data-back]"); if (back) back.onclick = () => { step--; renderStep(); };
     app.querySelector("[data-next]").onclick = () => { if (step < steps.length - 1) { step++; renderStep(); } else finishLesson(); };
@@ -797,8 +821,7 @@
     if (target) { target.classList.remove("look"); void target.offsetWidth; target.classList.add("look"); }
     const busy = (hasTTS && speechSynthesis.speaking) || !!nowAudio;
     if (busy) return;
-    const kind = stepsOf(L)[step];
-    speak(kind === "learn" ? "Listen to Fox, and repeat!" : (kind === "play" || kind === "tap") ? "Listen, and tap the right picture!" : "Listen to Fox first!");
+    replay();
   }
   const enableNext = () => { const n = app.querySelector("[data-next]"); if (n && n.disabled) { n.disabled = false; n.classList.add("pulse"); } };
   const minutes = () => "";
@@ -811,7 +834,8 @@
   }
 
   // ---------- guided flow: Fox says it once -> 5 s "your turn" -> next, by itself ----------
-  const TURN_MS = 5000;
+  const SPEED = Math.max(1, Number(window.HF_TEST_SPEED) || 1); // only the automated checks set this
+  const TURN_MS = 5000 / SPEED;
   let run = 0; // bumped on every screen change, so old timers/sequences stop
   function sayThen(text, cb, rate) {
     const my = run;
@@ -826,7 +850,7 @@
     speechSynthesis.speak(u);
     setTimeout(fin, 1800 + fill(text).length * 110); // safety net if the browser never fires onend
   }
-  const later = (ms, cb) => { const my = run; setTimeout(() => my === run && cb(), ms); };
+  const later = (ms, cb) => { const my = run; setTimeout(() => my === run && cb(), ms / SPEED); };
   function status(mode) {
     const st = app.querySelector(".status"); if (!st) return;
     st.className = "status " + mode;
@@ -990,6 +1014,7 @@
     const go = (from) => guide(items, from, () => sayThen("Now, new words!", () => later(400, () => { step = 1; renderStep(); })));
     app.querySelectorAll(".chip").forEach((c, i) => c.onclick = () => speak(review[i].say));
     fox.onclick = () => go(0);
+    replayFn = () => go(0);
     later(300, () => go(0));
   }
 
@@ -1016,6 +1041,7 @@
     els.forEach((b, i) => b.onclick = () => { b.classList.add("said"); go(i); }); // tapping a picture counts as meeting that word
     olds.forEach((b, i) => b.onclick = () => go(els.length + i));
     app.querySelector("[data-fox]").onclick = () => go(current ? current.idx : 0);
+    replayFn = () => go(current ? Math.min(current.idx, items.length - 1) : 0);
     app.querySelector("[data-again]").onclick = () => { els.concat(olds).forEach((e) => e.classList.remove("heard")); go(0); };
     // Next opens once Fox has said every new word, however she got there: tapping a card restarts Fox from that card,
     // so a child who taps around would otherwise never reach the end of the guided sequence and stay stuck.
@@ -1027,11 +1053,22 @@
   }
 
   // 3. Watch: YouTube's official embeddable player, loaded after a parent confirms (once per session)
-  const videoOK = () => root.settings.videoDay === today();
+  const videoOK = () => root.settings.video === "always" || (root.settings.video !== "off" && root.settings.videoDay === today());
   let ytListener = null;
   function stopYT() { if (ytListener) { window.removeEventListener("message", ytListener); ytListener = null; } }
   function stepWatch() {
     const v = L.video;
+    const sing = () => speakLines(L.chant || L.cards.map((c) => c.say));
+    if (root.settings.video === "off") { // no YouTube at all: the rhyme with Fox, nothing to approve, nothing to wait for
+      frame(`<h2>Sing with Fox</h2>
+        <div class="sing-box">${foxSVG("happy", 160)}
+          <button class="listen-btn" data-alt>${ICON.ear}<span>Sing with Fox</span></button></div>
+        ${note(t("n_sing"))}`, true);
+      replayFn = sing;
+      app.querySelector("[data-alt]").onclick = sing;
+      sayThen("Let's sing!", () => later(400, sing));
+      return;
+    }
     frame(`<h2>Watch & sing</h2>${minutes()}
       <div class="video-box" id="vbox"><div class="video-gate">
         ${foxSVG("surprised", 120)}
@@ -1084,7 +1121,7 @@
       app.querySelector("[data-next-v]").onclick = () => { step++; renderStep(); };
     };
     app.querySelector("[data-load]").onclick = () => videoOK() ? load(true) : parentGate(() => load(true));
-    app.querySelector("[data-alt]").onclick = () => speakLines(L.chant || L.cards.map((c) => c.say));
+    app.querySelector("[data-alt]").onclick = sing;
   }
 
   // 4. Play: a game (tap / café / memory / what's missing), then moves + dialogue with "hear myself"
@@ -1119,6 +1156,7 @@
     if (play.round === 0) sayThen(cafe ? "Welcome to my café! I'm hungry!" : STEP_SAY[3], () => later(300, ask));
     else later(300, ask);
     app.querySelector("[data-q]").onclick = ask;
+    replayFn = ask;
     app.querySelectorAll(".word-card").forEach((b) => b.onclick = () => {
       if (play.locked) return;
       const ck = cafe ? null : wk(L, order[play.round]);
@@ -1147,6 +1185,7 @@
         <span class="front">${pic(t.c, 70)}${esc(t.c.word)}</span></button>`).join("")}</div>
       ${note(t("n_memory"))}`, false);
     sayThen("Find the pairs!", () => { });
+    replayFn = () => speak("Find the pairs!");
     let open = [], found = 0, busy = false;
     app.querySelectorAll(".mem").forEach((b) => b.onclick = () => {
       const t = tiles[Number(b.dataset.t)];
@@ -1185,6 +1224,7 @@
         `<button class="chip" data-p="${i}">${pic(c, 34)}${esc(c.word)}</button>`).join("")}</div></div>
       ${note(t("n_missing"))}`, false);
     const look = app.querySelector(".look"), cover = app.querySelector(".cover"), pick = app.querySelector(".pick");
+    replayFn = () => speak(!pick.hidden ? "What's missing?" : !cover.hidden ? "Close your eyes!" : "Look! Remember the pictures!");
     sayThen(play.miss === 0 ? "Look! Remember the pictures!" : "Look again!", () => later(2500, () => {
       cover.hidden = false;
       sayThen("Close your eyes!", () => later(2500, () => {
@@ -1234,6 +1274,7 @@
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => showEnd("Well done! Again, or next?")); };
     mv.forEach((m, i) => m.onclick = () => go(i));
     app.querySelectorAll("[data-line]").forEach((b, i) => b.onclick = () => go(mv.length + i));
+    replayFn = () => go(current ? Math.min(current.idx, items.length - 1) : 0);
     app.querySelector("[data-again]").onclick = () => go(0);
     const rec = app.querySelector("[data-rec]"); if (rec) rec.onclick = () => { run++; focus(null); status(""); recordMe(rec); };
     sayThen(mv.length ? "Let's move!" : "Now, let's talk!", () => go(0));
@@ -1271,6 +1312,7 @@
       <div class="endbar"><button class="again-btn" data-again>${ICON.again} Again</button></div>`, true);
     confetti(16); chime(true);
     sayThen("Well done! Tap next!", () => {});
+    replayFn = () => speak("Well done! Tap next!");
     app.querySelector("[data-again]").onclick = stepTap;
   }
 
@@ -1317,6 +1359,7 @@
       guide(items, from, () => showEnd("Well done! Again, or next?")); };
     app.querySelector("[data-again]").onclick = () => go(0);
     app.querySelectorAll("[data-dot]").forEach((d) => d.onclick = () => go(d.dataset.dot === "q" ? items.length - 1 : Number(d.dataset.dot)));
+    replayFn = () => go(current ? Math.min(current.idx, items.length - 1) : 0);
     sayThen("Story time! " + S.title + (/[!?.]$/.test(S.title) ? "" : ".") + " Tap to turn the pages!", () => go(0));
   }
 
@@ -1337,6 +1380,7 @@
       onModel: () => { els[i].querySelector(".ask-a").hidden = false; const ps = app.querySelector(`[data-ps="${i}"]`); if (ps) ps.textContent = "⭐"; } }));
     const go = (from) => { app.querySelector(".endbar").hidden = true; guide(items, from, () => { confetti(14); showEnd("Well done! Again, or next?"); }); };
     els.forEach((e, i) => e.onclick = () => go(i));
+    replayFn = () => go(current ? Math.min(current.idx, items.length - 1) : 0);
     app.querySelector("[data-again]").onclick = () => { app.querySelectorAll(".ask-a").forEach((a) => a.hidden = true); app.querySelectorAll("[data-ps]").forEach((x) => x.textContent = "☆"); go(0); };
     sayThen("Fox asks, you answer!", () => go(0));
   }
@@ -1401,6 +1445,8 @@
       if (from === 0) log.innerHTML = ""; guide(items, from, () => { box.innerHTML = ""; confetti(16); showEnd("Great talking! Again, or next?"); }); };
     app.querySelector("[data-again]").onclick = () => go(0);
     app.querySelector("[data-start-chat]").onclick = () => go(0);
+    // the ear repeats Fox's current line (not the whole scene), or the instruction before the chat starts
+    replayFn = () => { const ln = current && !app.querySelector("[data-start-chat]") ? C.lines[Math.min(current.idx, C.lines.length - 1)] : null; speak(ln ? ln.fox : "Let's talk! Tap the button when you are ready!"); };
     sayThen("Let's talk! Tap the button when you are ready!", () => {});
   }
 
@@ -1494,6 +1540,7 @@
     const seen = new Set();
     const links = LESSONS.filter((l) => l.video && !seen.has(l.video.page) && seen.add(l.video.page)).map((l) =>
       `<li><a href="${esc(l.video.page)}" target="_blank" rel="noopener noreferrer">${esc(l.video.title)}</a></li>`).join("");
+    const videoOpt = (v, label) => `<label class="seg ${(st.video || "ask") === v ? "on" : ""}"><input type="radio" name="video" value="${v}" ${(st.video || "ask") === v ? "checked" : ""}>${label}</label>`;
     const limitOpt = (v, label) => `<label class="seg ${st.limit === v ? "on" : ""}"><input type="radio" name="limit" value="${v}" ${st.limit === v ? "checked" : ""}>${label}</label>`;
     const kidLessons = (p) => LESSONS.filter((l) => l.ready && p.data.lessons[l.id] && p.data.lessons[l.id].status === "done").length;
 
@@ -1531,6 +1578,8 @@
         <section class="card"><h2>${t("p_screen")}</h2>
           <fieldset class="segs"><legend>${t("p_per_day")}</legend>${limitOpt(1, "1")}${limitOpt(2, "2")}${limitOpt(0, t("no_limit"))}</fieldset>
           <p class="small">${t("p_screen_p", { n: lessonsToday() })}</p>
+          <fieldset class="segs"><legend>${t("p_video")}</legend>${videoOpt("ask", t("p_video_ask"))}${videoOpt("always", t("p_video_always"))}${videoOpt("off", t("p_video_off"))}</fieldset>
+          <p class="small">${t("p_video_p")}</p>
         </section>
 
         <section class="card"><h2>${t("p_code")}</h2>
@@ -1628,6 +1677,7 @@
       save(); renderParent(); toast(t("t_added", { name }));
     };
     app.querySelectorAll('input[name="limit"]').forEach((r) => r.onchange = () => { st.limit = Number(r.value); save(); renderParent(); toast(t("t_screen_saved")); });
+    app.querySelectorAll('input[name="video"]').forEach((r) => r.onchange = () => { st.video = r.value; save(); renderParent(); toast(t("t_saved")); });
     app.querySelector("[data-setcode]").onclick = () => {
       const v = app.querySelector("#pcode").value.trim();
       if (!/^\d{4}$/.test(v)) { toast(t("e_code4")); return; }

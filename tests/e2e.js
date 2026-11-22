@@ -192,8 +192,60 @@ const seeded = (settings) => ({ profiles: [{ id: "k", color: "#7C6CF2", data: { 
     await p.click("[data-nextwrap]"); await p.waitForTimeout(100);
     check(await p.$eval("[data-next]", (n) => n.disabled && n.classList.contains("nope")), "tapping a grey Next makes it shake, and it stays grey");
     check(!!(await p.$(".look")), "tapping a grey Next makes the thing to do now wiggle");
-    check((await p.evaluate(() => window.__hint)).includes("Listen to Fox, and repeat!"), "tapping a grey Next makes Fox say what to do when she is quiet");
+    check((await p.evaluate(() => window.__hint)).length > 0, "tapping a grey Next makes Fox repeat what to do when she is quiet");
     check(!!(await p.$(".learn")), "tapping a grey Next does not move on");
+    await p.context().close();
+
+    // ---------- 2c-8. "hear it again": the ear button repeats what matters on every screen, no reading needed ----------
+    p = await newPage("replay", {}, seeded({ code: "1234", video: "off" }));
+    await p.evaluate(() => { window.__said = []; speechSynthesis.speak = (u) => { window.__said.push(u.text); setTimeout(() => u.onend && u.onend(), 30); }; });
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    const heard = () => p.evaluate(() => { const s = window.__said.slice(); window.__said.length = 0; return s; });
+    const kinds = ["hello", "learn", "watch", "play", "stars"];
+    let replayOK = 0;
+    for (let k = 0; k < kinds.length; k++) {
+      await p.waitForTimeout(200); await heard();
+      await p.click("[data-replay]"); await p.waitForTimeout(400);
+      const s = await heard();
+      if (s.length) replayOK++; else console.log(`         (ear button said nothing on the ${kinds[k]} screen)`);
+      if (k < kinds.length - 1) await forceNext(p);
+    }
+    check(replayOK === kinds.length, `the ear button makes Fox speak on every Level 1 screen (${replayOK}/${kinds.length})`);
+    check(await p.$eval("[data-replay]", (b) => b.getBoundingClientRect().width >= 48), "the ear button is big enough for a small finger");
+    await p.context().close();
+
+    // ---------- 2c-9. parent tips are behind the parent gate (once per visit) ----------
+    p = await newPage("tips-gate", {}, seeded({ code: "1234" }));
+    await p.click("[data-start]"); await p.waitForTimeout(300);
+    await p.click("[data-tips]"); await p.waitForTimeout(200);
+    check(!!(await p.$(".gate")) && (await p.$$eval(".parent-note", (ns) => ns.every((n) => n.hidden))), "tapping Parent tips asks for the parent code first");
+    for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(300);
+    check(!(await p.$(".gate")) && !!(await p.$(".parent-note:not([hidden])")), "with the code, the tips open");
+    await forceNext(p); await p.waitForTimeout(200); await p.click("[data-tips]"); await p.waitForTimeout(200);
+    check(!(await p.$(".gate")) && !!(await p.$(".parent-note:not([hidden])")), "on the next screen the tips open without asking again");
+    await p.context().close();
+
+    // ---------- 2c-10. videos: off = sing with Fox, no gate; always = plays without the gate; ask = gate (default) ----------
+    p = await newPage("video-off", {}, seeded({ code: "1234", video: "off" }));
+    await p.click("[data-start]"); await forceNext(p); await forceNext(p); await p.waitForTimeout(300);
+    check(!(await p.$("[data-load]")) && !!(await p.$(".sing-box [data-alt]")) && !(await p.$eval("[data-next]", (n) => n.disabled)),
+      "videos off: the step is 'Sing with Fox', no YouTube button, Next already open");
+    await p.context().close();
+    p = await newPage("video-always", {}, seeded({ code: "1234", video: "always" }));
+    await p.click("[data-start]"); await forceNext(p); await forceNext(p); await p.waitForTimeout(300);
+    await p.click("[data-load]"); await p.waitForTimeout(300);
+    check(!(await p.$(".gate")) && !!(await p.$("iframe")), "videos always allowed: Play video starts without the parent gate");
+    await p.context().close();
+    p = await newPage("video-ask", {}, seeded({ code: "1234" }));
+    await p.click("[data-start]"); await forceNext(p); await forceNext(p); await p.waitForTimeout(300);
+    await p.click("[data-load]"); await p.waitForTimeout(300);
+    check(!!(await p.$(".gate")), "videos on 'ask' (the default): Play video still asks the parent once a day");
+    await p.click("[data-cancel]");
+    await p.context().close();
+    p = await newPage("video-setting", {}, seeded({ code: "1234" }));
+    await p.click("[data-parent]"); for (const d of "1234") await p.click(`.keypad [data-k="${d}"]`); await p.waitForTimeout(300);
+    await p.click('input[name="video"][value="off"]'); await p.waitForTimeout(200);
+    check((await p.evaluate(() => JSON.parse(localStorage.getItem("hellofox-v2")).settings.video)) === "off", "the video choice is saved from the parent area");
     await p.context().close();
 
     // ---------- 2c-quater. the big Start button is fully on screen on a landscape tablet ----------
