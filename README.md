@@ -45,7 +45,7 @@ Lesson content lives in `lessons.js` and `level2.js`. Supporting missions and il
 ## Parent features
 
 - Multiple child profiles, each with their own progress, stars and stickers.
-- A parent area protected by a locally stored 4-digit code.
+- A parent area protected by a locally stored 4-digit code, set during setup. The code can be changed but not removed.
 - Daily lesson limits, calm mode and sound settings.
 - Backup export and import.
 - Parent voice recordings and settings for the optional “Fox listens” speech check.
@@ -68,7 +68,10 @@ A green CI result confirms that the automated checks passed in their test enviro
 
 ## Privacy and limitations
 
-- Child names and progress are stored in local browser storage. They are not synchronised between devices. Clearing site data can erase progress; export a backup regularly and verify that it can be restored.
+- Child names, progress, settings and the parent code are stored in the browser's local storage on the device. Words a parent records in their own voice (parent area, "Record words") are stored on the device too, in the browser's IndexedDB, until removed. Nothing is synchronised between devices or sent to a server. Clearing site data erases all of it; export a backup regularly and verify that it can be restored.
+- The parent area has a **Delete everything** button that erases every profile, all progress, the settings, the parent code and the voice recordings from the device.
+- After three wrong parent codes (or three wrong answers to the fallback sum), each further wrong answer forces a 30-second wait. This slows down guessing by a child; it is not protection against an adult with the device.
+- The app opens from its offline copy and fetches updates in the background, so a new version is used from the next launch after it was downloaded.
 - Speech playback and speech recognition depend on browser and device support. The speech check is optional and should not be treated as a definitive pronunciation assessment.
 - Videos use YouTube's embedded no-cookie player and require internet access. A third-party video provider may still process connection data when a video is played.
 - The project links to third-party learning content and is not affiliated with those content owners.

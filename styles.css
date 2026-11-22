@@ -435,6 +435,9 @@ h1, h2, .brand, .word-card, .prompt, .big-start .s-main, .next-btn, .listen-btn,
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .keypad button { min-height: 64px; border-radius: 18px; background: #F1ECE4; font: 700 26px Fredoka, sans-serif; }
 .gate-cancel { margin-top: 14px; min-height: 52px; background: transparent; color: var(--soft); font-weight: 800; }
+.gate-wait { margin: 10px 0 0; font-weight: 800; color: var(--berry); }
+.gate-box button:disabled { opacity: .45; }
+.stored { margin: 6px 0 10px; padding-left: 20px; } .stored li { margin: 4px 0; }
 
 /* Parent area */
 .p-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }

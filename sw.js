@@ -1,5 +1,6 @@
-// Offline support: caches the app shell. Bump VERSION whenever you change a file.
-const VERSION = "hellofox-v24";
+// Offline support: caches the app shell. Bump VERSION whenever you change a file: the new version is fetched in the
+// background and used from the next launch (the app never waits on the network to open, even on a bad connection).
+const VERSION = "hellofox-v25";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "lessons.js", "level2.js", "missions.js", "i18n.js", "art.js", "art2.js", "manifest.webmanifest",
   "fonts/fonts.css", "fonts/fredoka-latin-600-normal.woff2", "fonts/fredoka-latin-700-normal.woff2",
@@ -18,14 +19,22 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-// Same-origin only: network first (so updates arrive), cache as fallback when offline.
-// Third-party requests (YouTube) are never cached.
+// Same-origin GET only; third-party requests (YouTube) are never touched or cached.
+// Cached copy first, so the app opens at once, offline or on a weak connection. The network copy is fetched in the
+// background and stored for next time, but only when it is a real success: an error page is never cached.
+// Offline with nothing cached: a page load gets the app shell; anything else (an image, a font) just fails.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
-      .then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return res; })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("index.html")))
+    caches.open(VERSION).then(async (c) => {
+      const cached = await c.match(e.request);
+      const fresh = fetch(e.request).then((res) => { if (res.ok) c.put(e.request, res.clone()); return res; }).catch(() => null);
+      if (cached) { e.waitUntil(fresh); return cached; }
+      const res = await fresh;
+      if (res) return res;
+      if (e.request.mode === "navigate") { const shell = await c.match("index.html"); if (shell) return shell; }
+      return Response.error();
+    })
   );
 });
